@@ -184,9 +184,25 @@ impl Island {
     ) -> Result<(), String> {
         self.process_events(tick, world_config);
         if let Some(index) = self.building(building) {
-            // TODO: Add a build time, this effectively builds instantly and ignores in-flight production events
-            self.buildings[index].level += 1;
-            Ok(())
+            // Verify if the building can be built
+            let cost = &world_config.islands.buildings.get("goldpit").unwrap().cost
+                [self.building_level(building)];
+            if self.gold >= *cost.get("gold").unwrap_or(&0)
+                && self.lumber >= *cost.get("lumber").unwrap_or(&0)
+                && self.stone >= *cost.get("stone").unwrap_or(&0)
+            {
+                // Deduct the cost
+                self.gold -= cost.get("gold").unwrap_or(&0);
+                self.lumber -= cost.get("lumber").unwrap_or(&0);
+                self.stone -= cost.get("stone").unwrap_or(&0);
+                // Increase the level
+                // TODO: Add a build time, this effectively builds instantly and ignores in-flight production events
+                self.buildings[index].level += 1;
+                Ok(())
+            } else {
+                // Not enough resources
+                Err("Not enough resources".to_string())
+            }
         } else {
             // Building does not exist
             Err("Building not found".to_string())
@@ -204,6 +220,11 @@ pub struct BuildingConfig {
     ///
     /// The number of ticks needed to produce the resource at a level
     pub production: Option<Vec<usize>>,
+
+    /// Cost for each level
+    /// They are the costs to level up from the current level to the next level
+    /// The first element is the cost to level up from 0 to 1
+    pub cost: Vec<HashMap<String, usize>>,
 }
 
 /// Configuration for the creation of an island
