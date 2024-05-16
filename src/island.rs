@@ -21,15 +21,17 @@ struct Building {
     level: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Event {
     completion: usize,
-    callback: EventCallback,
+    action: EventCallback,
     building: Option<BuildingType>,
 }
 
-#[derive(Clone)]
-enum EventCallback {
+pub type EventInfo = Event;
+
+#[derive(Clone, Debug)]
+pub enum EventCallback {
     Gold,
     Lumber,
     Stone,
@@ -96,7 +98,7 @@ impl Island {
                     let time = config.production.as_ref().unwrap()[building.level];
                     events.push(Event {
                         completion: tick + time,
-                        callback: EventCallback::Gold,
+                        action: EventCallback::Gold,
                         building: None,
                     });
                 }
@@ -105,7 +107,7 @@ impl Island {
                     let time = config.production.as_ref().unwrap()[building.level];
                     events.push(Event {
                         completion: tick + time,
-                        callback: EventCallback::Lumber,
+                        action: EventCallback::Lumber,
                         building: None,
                     });
                 }
@@ -115,7 +117,7 @@ impl Island {
                     let time = config.production.as_ref().unwrap()[building.level];
                     events.push(Event {
                         completion: tick + time,
-                        callback: EventCallback::Stone,
+                        action: EventCallback::Stone,
                         building: None,
                     });
                 }
@@ -212,7 +214,7 @@ impl Island {
         if event.completion > tick {
             return;
         }
-        match event.callback {
+        match event.action {
             EventCallback::Gold => {
                 self.gold += 1;
                 // Create a new event for the next gold piece
@@ -222,7 +224,7 @@ impl Island {
                     .unwrap()[self.building_level(BuildingType::GoldPit)];
                 self.register_event(Event {
                     completion: event.completion + time,
-                    callback: EventCallback::Gold,
+                    action: EventCallback::Gold,
                     building: None,
                 });
             }
@@ -235,7 +237,7 @@ impl Island {
                     .unwrap()[self.building_level(BuildingType::Sawmill)];
                 self.register_event(Event {
                     completion: event.completion + time,
-                    callback: EventCallback::Lumber,
+                    action: EventCallback::Lumber,
                     building: None,
                 });
             }
@@ -248,7 +250,7 @@ impl Island {
                     .unwrap()[self.building_level(BuildingType::StoneBasin)];
                 self.register_event(Event {
                     completion: event.completion + time,
-                    callback: EventCallback::Stone,
+                    action: EventCallback::Stone,
                     building: None,
                 });
             }
@@ -348,7 +350,7 @@ impl Island {
                 // Increase the level
                 self.register_event(Event {
                     completion: tick + cost.get("time").unwrap_or(&1),
-                    callback: EventCallback::Build,
+                    action: EventCallback::Build,
                     building: Some(building),
                 });
                 Ok(())
@@ -414,6 +416,7 @@ impl Island {
                 stone: self.stone,
                 buildings: HashMap::new(),
                 production: self.get_production(tick, world_config),
+                events: self.events.clone(),
             };
             for building in self.buildings.iter() {
                 details.buildings.insert(building.name, building.level);

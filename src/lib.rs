@@ -1,3 +1,4 @@
+use island::{EventInfo};
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -58,6 +59,11 @@ pub struct IslandInfo {
     pub production: IslandProduction,
     /// Building levels
     pub buildings: HashMap<BuildingType, usize>,
+
+    /// Events in flight
+    ///
+    /// Next resource, unit builds, incoming attacks, etc.
+    pub events: Vec<EventInfo>,
 }
 
 /// Struct to hold the cost for a build
