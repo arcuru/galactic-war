@@ -8,8 +8,16 @@ use crate::island::Island;
 pub use crate::island::{BuildingType, IslandConfig};
 
 pub struct World {
+    /// Cached configuration for the world
     config: WorldConfig,
+
+    /// All the islands in the world
     islands: HashMap<(usize, usize), Island>,
+
+    /// The most recent tick
+    ///
+    /// This is used to ensure that events can only arrive in order
+    tick: usize,
 }
 
 /// Configuration for the world
@@ -46,11 +54,16 @@ impl World {
             let island = Island::new(initial_tick, &config.islands);
             islands.insert((x, y), island);
         }
-        Self { config, islands }
+        Self {
+            config,
+            islands,
+            tick: initial_tick,
+        }
     }
 
     /// Return basic stats about the World
-    pub fn stats(&mut self, tick: usize) -> String {
+    pub fn stats(&mut self, tick: usize) -> Result<String, String> {
+        self.update_tick(tick)?;
         let mut stats = format!("Island count: {}\n", self.config.island_count);
         for (coords, island) in self.islands.iter_mut() {
             stats.push_str(&format!(
@@ -60,7 +73,7 @@ impl World {
                 island.gold(tick, &self.config),
             ));
         }
-        stats
+        Ok(stats)
     }
 
     /// Retrieve the full list of islands
@@ -75,7 +88,17 @@ impl World {
         (x, y): (usize, usize),
         building: BuildingType,
     ) -> Result<(), String> {
+        self.update_tick(tick)?;
         let island = self.islands.get_mut(&(x, y)).unwrap();
         island.build(tick, &self.config, building)
+    }
+
+    /// Update the current tick, and verify we are not going back in time
+    fn update_tick(&mut self, tick: usize) -> Result<(), String> {
+        if tick < self.tick {
+            return Err("Tick is out of order".to_string());
+        }
+        self.tick = tick;
+        Ok(())
     }
 }
