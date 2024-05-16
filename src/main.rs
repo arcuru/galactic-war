@@ -1,7 +1,6 @@
 use islandfight::{BuildingType, World, WorldConfig};
 
-fn main() {
-    //let mut file = File::open("../worlds/classic.yaml").unwrap();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let contents = include_str!("../worlds/classic.yaml");
     let world_config: WorldConfig = serde_yaml::from_str(contents).unwrap();
     let mut world = World::new(world_config, 0);
@@ -23,5 +22,13 @@ fn main() {
     ) {
         println!("Error: {}", err);
     }
-    println!("{}", world.stats(150));
+    println!("{}", world.stats(199));
+    println!("{}", world.stats(301));
+    world.build(
+        301,
+        *world.islands().keys().next().unwrap(),
+        BuildingType::GoldPit,
+    )?;
+    println!("{}", world.stats(302));
+    Ok(())
 }

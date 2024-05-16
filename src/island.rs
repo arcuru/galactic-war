@@ -1,7 +1,9 @@
+use core::panic;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::WorldConfig;
+use std::fmt;
 
 /// An Island in the world
 pub struct Island {
@@ -22,14 +24,16 @@ struct Building {
 pub struct Event {
     completion: usize,
     callback: EventCallback,
+    building: Option<BuildingType>,
 }
 
 #[derive(Clone)]
 enum EventCallback {
     Gold,
+    Build,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuildingType {
     Fortress,
     GoldPit,
@@ -41,6 +45,12 @@ pub enum BuildingType {
     WatchTower,
 }
 
+impl fmt::Display for BuildingType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl Island {
     /// Create a new island
     pub fn new(tick: usize, config: &IslandConfig) -> Self {
@@ -50,6 +60,7 @@ impl Island {
         let events = vec![Event {
             completion: tick + 10,
             callback: EventCallback::Gold,
+            building: None,
         }];
         let buildings = vec![Building {
             name: BuildingType::GoldPit,
@@ -109,7 +120,17 @@ impl Island {
                 self.register_event(Event {
                     completion: event.completion + time,
                     callback: EventCallback::Gold,
+                    building: None,
                 });
+            }
+            EventCallback::Build => {
+                // Build the building
+                if let Some(building) = event.building {
+                    let index = self.building(building).unwrap();
+                    self.buildings[index].level += 1;
+                } else {
+                    panic!("Building event without building type");
+                }
             }
         }
     }
@@ -185,8 +206,12 @@ impl Island {
         self.process_events(tick, world_config);
         if let Some(index) = self.building(building) {
             // Verify if the building can be built
-            let cost = &world_config.islands.buildings.get("goldpit").unwrap().cost
-                [self.building_level(building)];
+            let cost = &world_config
+                .islands
+                .buildings
+                .get(&self.buildings[index].name.to_string().to_lowercase())
+                .unwrap()
+                .cost[self.building_level(building)];
             if self.gold >= *cost.get("gold").unwrap_or(&0)
                 && self.lumber >= *cost.get("lumber").unwrap_or(&0)
                 && self.stone >= *cost.get("stone").unwrap_or(&0)
@@ -196,8 +221,11 @@ impl Island {
                 self.lumber -= cost.get("lumber").unwrap_or(&0);
                 self.stone -= cost.get("stone").unwrap_or(&0);
                 // Increase the level
-                // TODO: Add a build time, this effectively builds instantly and ignores in-flight production events
-                self.buildings[index].level += 1;
+                self.register_event(Event {
+                    completion: tick + cost.get("time").unwrap_or(&1),
+                    callback: EventCallback::Build,
+                    building: Some(building),
+                });
                 Ok(())
             } else {
                 // Not enough resources
