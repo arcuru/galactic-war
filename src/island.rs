@@ -50,12 +50,21 @@ impl Island {
     /// Callback for the goldpit, increase the gold amount by one and create a new callback
     fn goldpit_callback(
         tick: usize,
-        _world_config: &WorldConfig,
+        world_config: &WorldConfig,
         island: &mut Island,
     ) -> Option<Event> {
+        // Get the time needed to produce a gold piece from the WorldConfig
+        let time = world_config
+            .islands
+            .buildings
+            .get("goldpit")
+            .unwrap()
+            .production
+            .as_ref()
+            .unwrap()[island.buildings.goldpit];
         island.gold += 1;
         Some(Event {
-            completion: tick + 10,
+            completion: tick + time,
             callback: EventCallback::Gold,
         })
     }
@@ -113,24 +122,32 @@ impl Island {
         self.process_events(tick, world_config);
         self.buildings.goldpit
     }
+
+    /// Build a building
+    pub fn build_goldpit(&mut self, tick: usize, world_config: &WorldConfig) {
+        self.process_events(tick, world_config);
+        self.buildings.goldpit += 1;
+        // FIXME: this should modify the currently producing gold piece event
+    }
 }
 
 #[derive(Deserialize)]
 pub struct BuildingConfig {
-    /// Name of the building
-    /// Must be one of the predefined types
-    pub name: String,
-
     /// Starting level for this type of building
     /// If not provided it is 0
     pub starting_level: Option<usize>,
+
+    /// Used for Gold/Stone/Lumber
+    ///
+    /// The number of ticks needed to produce the resource at a level
+    pub production: Option<Vec<usize>>,
 }
 
 /// Configuration for the creation of an island
 #[derive(Deserialize)]
 pub struct IslandConfig {
     /// List of buildings that will be built on the island
-    pub buildings: Vec<BuildingConfig>,
+    pub buildings: HashMap<String, BuildingConfig>,
 
     /// Starting resources for the island
     pub resources: HashMap<String, usize>,

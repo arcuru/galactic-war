@@ -62,4 +62,15 @@ impl World {
         }
         stats
     }
+
+    /// Retrieve the full list of islands
+    pub fn islands(&self) -> &HashMap<(usize, usize), Island> {
+        &self.islands
+    }
+
+    /// Build a goldpit on an island
+    pub fn build_goldpit(&mut self, tick: usize, (x, y): (usize, usize)) {
+        let island = self.islands.get_mut(&(x, y)).unwrap();
+        island.build_goldpit(tick, &self.config);
+    }
 }

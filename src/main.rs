@@ -7,6 +7,7 @@ fn main() {
     let mut world = World::new(world_config, 0);
 
     println!("{}", world.stats(29));
+    world.build_goldpit(30, *world.islands().keys().next().unwrap());
     println!("{}", world.stats(30));
-    println!("{}", world.stats(31));
+    println!("{}", world.stats(59));
 }
