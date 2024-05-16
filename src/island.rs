@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::WorldConfig;
@@ -114,6 +115,7 @@ impl Island {
     }
 }
 
+#[derive(Deserialize)]
 pub struct BuildingConfig {
     /// Name of the building
     /// Must be one of the predefined types
@@ -125,6 +127,7 @@ pub struct BuildingConfig {
 }
 
 /// Configuration for the creation of an island
+#[derive(Deserialize)]
 pub struct IslandConfig {
     /// List of buildings that will be built on the island
     pub buildings: Vec<BuildingConfig>,

@@ -1,18 +1,11 @@
-use islandfight::{IslandConfig, World, WorldConfig};
+use islandfight::{World, WorldConfig};
 
 fn main() {
-    // For now, we're just running some very basic stuff here to test the lib
-    let mut world = World::new(
-        WorldConfig {
-            island_count: 2,
-            size: (100, 100),
-            islands: IslandConfig {
-                resources: Default::default(),
-                buildings: Default::default(),
-            },
-        },
-        0,
-    );
+    //let mut file = File::open("../worlds/classic.yaml").unwrap();
+    let contents = include_str!("../worlds/classic.yaml");
+    let world_config: WorldConfig = serde_yaml::from_str(contents).unwrap();
+    let mut world = World::new(world_config, 0);
+
     println!("{}", world.stats(29));
     println!("{}", world.stats(30));
     println!("{}", world.stats(31));

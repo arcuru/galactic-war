@@ -1,4 +1,5 @@
 use rand::Rng;
+use serde::Deserialize;
 use std::collections::HashMap;
 
 mod island;
@@ -12,15 +13,22 @@ pub struct World {
 }
 
 /// Configuration for the world
+#[derive(Deserialize)]
 pub struct WorldConfig {
     /// Static Island Count
     pub island_count: usize,
 
     /// World size
-    pub size: (usize, usize),
+    pub size: WorldSize,
 
     /// Island Config
     pub islands: IslandConfig,
+}
+
+#[derive(Deserialize)]
+pub struct WorldSize {
+    pub x: usize,
+    pub y: usize,
 }
 
 impl World {
@@ -33,8 +41,8 @@ impl World {
             // Create a new island at a random location in the 2d space
 
             let mut rng = rand::thread_rng();
-            let x: usize = rng.gen_range(0..=config.size.0);
-            let y: usize = rng.gen_range(0..=config.size.1);
+            let x: usize = rng.gen_range(0..=config.size.x);
+            let y: usize = rng.gen_range(0..=config.size.y);
             let island = Island::new(initial_tick, &config.islands);
             islands.insert((x, y), island);
         }

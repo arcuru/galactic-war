@@ -1,0 +1,10 @@
+island_count: 2
+size:
+  x: 100
+  y: 100
+islands:
+  resources:
+    gold: 0
+  buildings:
+    - name: goldpit
+      starting_level: 0

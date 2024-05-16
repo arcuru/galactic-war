@@ -6,3 +6,5 @@ description = "A casual game based on the classic Inselkampf"
 
 [dependencies]
 rand = "0.8.4"
+serde = { version = "1.0.202", features = ["derive"] }
+serde_yaml = "0.9.33"
