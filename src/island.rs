@@ -2,7 +2,7 @@ use core::panic;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::{Details, IslandInfo, IslandProduction, WorldConfig};
+use crate::{BuildingInfo, Cost, Details, IslandInfo, IslandProduction, WorldConfig};
 use std::fmt;
 
 /// An Island in the world
@@ -103,6 +103,35 @@ impl Island {
             .buildings
             .get(&building.to_string().to_lowercase())
             .unwrap()
+    }
+
+    /// Get the resource production of a single building
+    fn get_building_production(
+        &mut self,
+        tick: usize,
+        world_config: &WorldConfig,
+        building: BuildingType,
+    ) -> IslandProduction {
+        self.process_events(tick, world_config);
+        let mut production = IslandProduction {
+            gold: 0,
+            lumber: 0,
+            stone: 0,
+        };
+        match building {
+            BuildingType::GoldPit => {
+                let config = Island::get_building_config(world_config, BuildingType::GoldPit);
+                production.gold =
+                    config.production.as_ref().unwrap()[self.building_level(BuildingType::GoldPit)];
+            }
+            BuildingType::Sawmill => {
+                let config = Island::get_building_config(world_config, BuildingType::Sawmill);
+                production.lumber =
+                    config.production.as_ref().unwrap()[self.building_level(BuildingType::Sawmill)];
+            }
+            _ => {}
+        };
+        production
     }
 
     /// Get the production of the island
@@ -262,8 +291,42 @@ impl Island {
         building: Option<BuildingType>,
     ) -> Result<Details, String> {
         self.process_events(tick, world_config);
-        if building.is_some() {
-            Err("Building details not implemented".to_string())
+        if let Some(building) = building {
+            let mut details = BuildingInfo {
+                level: self.building_level(building),
+                production: Some(self.get_building_production(tick, world_config, building)),
+                builds: None,
+            };
+            if building == BuildingType::Fortress {
+                if details.builds.is_none() {
+                    details.builds = Some(HashMap::new());
+                }
+                let builds = details.builds.as_mut().unwrap();
+                for building in self.buildings.iter() {
+                    builds.insert(
+                        building.name,
+                        Cost {
+                            gold: *Island::get_building_config(world_config, building.name).cost
+                                [building.level]
+                                .get("gold")
+                                .unwrap_or(&0),
+                            lumber: *Island::get_building_config(world_config, building.name).cost
+                                [building.level]
+                                .get("lumber")
+                                .unwrap_or(&0),
+                            stone: *Island::get_building_config(world_config, building.name).cost
+                                [building.level]
+                                .get("stone")
+                                .unwrap_or(&0),
+                            ticks: *Island::get_building_config(world_config, building.name).cost
+                                [building.level]
+                                .get("time")
+                                .unwrap_or(&0),
+                        },
+                    );
+                }
+            }
+            Ok(Details::Building(details))
         } else {
             let mut details = IslandInfo {
                 score: self.score(tick, world_config),

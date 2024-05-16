@@ -60,12 +60,33 @@ pub struct IslandInfo {
     pub buildings: HashMap<BuildingType, usize>,
 }
 
+/// Struct to hold the cost for a build
+#[derive(Debug)]
+pub struct Cost {
+    pub gold: usize,
+    pub lumber: usize,
+    pub stone: usize,
+    pub ticks: usize,
+}
+
+/// Info for a specific Building
+///
+/// Lots of details are optional, as they don't all apply to all buildings
+#[derive(Debug)]
+pub struct BuildingInfo {
+    pub level: usize,
+    pub production: Option<IslandProduction>,
+    pub builds: Option<HashMap<BuildingType, Cost>>,
+}
+
 /// Info to use in return values
 ///
 /// Stores IslandInfo, and will store details about buildings in the future
+/// TODO: Is this really the best approach? If it's just two types, may want to just split the API.
 #[derive(Debug)]
 pub enum Details {
     Island(IslandInfo),
+    Building(BuildingInfo),
 }
 
 impl World {
