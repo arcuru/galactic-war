@@ -20,3 +20,27 @@ islands:
         - gold: 30
         - gold: 40
           time: 1
+    sawmill:
+      production: [10, 1, 1, 1, 1]
+      cost:
+        - gold: 10
+          stone: 0
+          time: 100
+        - gold: 20
+          stone: 0
+          time: 1
+        - gold: 30
+        - gold: 40
+          time: 1
+    stonebasin:
+      production: [10, 1, 1, 1, 1]
+      cost:
+        - gold: 1
+          stone: 1
+          time: 100
+        - gold: 20
+          stone: 0
+          time: 1
+        - gold: 30
+        - gold: 40
+          time: 1

@@ -5,6 +5,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let world_config: WorldConfig = serde_yaml::from_str(contents).unwrap();
     let mut world = World::new(world_config, 0);
 
+    let island = *world.islands().keys().next().unwrap();
+
     println!("{}", world.stats(29)?);
     if let Err(err) = world.build(
         30,
@@ -15,40 +17,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("{}", world.stats(30)?);
     println!("{}", world.stats(59)?);
-    if let Err(err) = world.build(
-        100,
-        *world.islands().keys().next().unwrap(),
-        BuildingType::GoldPit,
-    ) {
+    if let Err(err) = world.build(105, island, BuildingType::Sawmill) {
         println!("Error: {}", err);
     }
-    println!("{}", world.stats(199)?);
+    if let Err(err) = world.build(150, island, BuildingType::StoneBasin) {
+        println!("Error: {}", err);
+    }
     println!("{}", world.stats(301)?);
-    world.build(
-        301,
-        *world.islands().keys().next().unwrap(),
-        BuildingType::GoldPit,
-    )?;
+    world.build(301, island, BuildingType::GoldPit)?;
     println!("{}", world.stats(302)?);
-    println!(
-        "{:?}",
-        world.get_details(302, *world.islands().keys().next().unwrap(), None)?
-    );
+    println!("{:?}", world.get_details(302, island, None)?);
     println!(
         "Fortress: {:?}",
-        world.get_details(
-            302,
-            *world.islands().keys().next().unwrap(),
-            Some(BuildingType::Fortress)
-        )?
+        world.get_details(302, island, Some(BuildingType::Fortress))?
     );
     println!(
         "Gold Pit: {:?}",
-        world.get_details(
-            302,
-            *world.islands().keys().next().unwrap(),
-            Some(BuildingType::GoldPit)
-        )?
+        world.get_details(302, island, Some(BuildingType::GoldPit))?
     );
     Ok(())
 }

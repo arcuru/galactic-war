@@ -101,7 +101,7 @@ impl World {
             let mut rng = rand::thread_rng();
             let x: usize = rng.gen_range(0..=config.size.x);
             let y: usize = rng.gen_range(0..=config.size.y);
-            let island = Island::new(initial_tick, &config.islands);
+            let island = Island::new(initial_tick, &config.islands, &config);
             islands.insert((x, y), island);
         }
         Self {

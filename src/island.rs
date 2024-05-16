@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::{BuildingInfo, Cost, Details, IslandInfo, IslandProduction, WorldConfig};
 use std::fmt;
+use std::str::FromStr;
 
 /// An Island in the world
 pub struct Island {
@@ -30,6 +31,8 @@ pub struct Event {
 #[derive(Clone)]
 enum EventCallback {
     Gold,
+    Lumber,
+    Stone,
     Build,
 }
 
@@ -51,26 +54,76 @@ impl fmt::Display for BuildingType {
     }
 }
 
+impl FromStr for BuildingType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "fortress" => Ok(BuildingType::Fortress),
+            "goldpit" => Ok(BuildingType::GoldPit),
+            "stonebasin" => Ok(BuildingType::StoneBasin),
+            "sawmill" => Ok(BuildingType::Sawmill),
+            "garrison" => Ok(BuildingType::Garrison),
+            "warehouse" => Ok(BuildingType::Warehouse),
+            "barricade" => Ok(BuildingType::Barricade),
+            "watchtower" => Ok(BuildingType::WatchTower),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Island {
     /// Create a new island
-    pub fn new(tick: usize, config: &IslandConfig) -> Self {
-        let gold = *config.resources.get("gold").unwrap_or(&0);
-        let lumber = *config.resources.get("lumber").unwrap_or(&0);
-        let stone = *config.resources.get("stone").unwrap_or(&0);
-        let events = vec![Event {
-            completion: tick + 10,
-            callback: EventCallback::Gold,
-            building: None,
-        }];
-        let buildings = vec![Building {
-            name: BuildingType::GoldPit,
-            level: config
-                .buildings
-                .get("goldpit")
-                .unwrap()
-                .starting_level
-                .unwrap_or(0),
-        }];
+    ///
+    /// This takes an IslandConfig because there may be multiple island types in future
+    pub fn new(tick: usize, island_config: &IslandConfig, world_config: &WorldConfig) -> Self {
+        let gold = *island_config.resources.get("gold").unwrap_or(&0);
+        let lumber = *island_config.resources.get("lumber").unwrap_or(&0);
+        let stone = *island_config.resources.get("stone").unwrap_or(&0);
+        let mut buildings = Vec::new();
+        for (name, building) in island_config.buildings.iter() {
+            buildings.push(Building {
+                name: BuildingType::from_str(name).unwrap(),
+                level: building.starting_level.unwrap_or(0),
+            });
+        }
+        // Kick off events for the buildings
+        let mut events = Vec::new();
+        for building in buildings.iter() {
+            match building.name {
+                BuildingType::GoldPit => {
+                    let config = Island::get_building_config(world_config, BuildingType::GoldPit);
+                    let time = config.production.as_ref().unwrap()[building.level];
+                    events.push(Event {
+                        completion: tick + time,
+                        callback: EventCallback::Gold,
+                        building: None,
+                    });
+                }
+                BuildingType::Sawmill => {
+                    let config = Island::get_building_config(world_config, BuildingType::Sawmill);
+                    let time = config.production.as_ref().unwrap()[building.level];
+                    events.push(Event {
+                        completion: tick + time,
+                        callback: EventCallback::Lumber,
+                        building: None,
+                    });
+                }
+                BuildingType::StoneBasin => {
+                    let config =
+                        Island::get_building_config(world_config, BuildingType::StoneBasin);
+                    let time = config.production.as_ref().unwrap()[building.level];
+                    events.push(Event {
+                        completion: tick + time,
+                        callback: EventCallback::Stone,
+                        building: None,
+                    });
+                }
+                _ => {}
+            }
+        }
+        events.sort_by_key(|e| e.completion);
+
         Self {
             events,
             gold,
@@ -170,6 +223,32 @@ impl Island {
                 self.register_event(Event {
                     completion: event.completion + time,
                     callback: EventCallback::Gold,
+                    building: None,
+                });
+            }
+            EventCallback::Lumber => {
+                self.lumber += 1;
+                // Create a new event for the next lumber piece
+                let time = Island::get_building_config(world_config, BuildingType::Sawmill)
+                    .production
+                    .as_ref()
+                    .unwrap()[self.building_level(BuildingType::Sawmill)];
+                self.register_event(Event {
+                    completion: event.completion + time,
+                    callback: EventCallback::Lumber,
+                    building: None,
+                });
+            }
+            EventCallback::Stone => {
+                self.stone += 1;
+                // Create a new event for the next stone piece
+                let time = Island::get_building_config(world_config, BuildingType::StoneBasin)
+                    .production
+                    .as_ref()
+                    .unwrap()[self.building_level(BuildingType::StoneBasin)];
+                self.register_event(Event {
+                    completion: event.completion + time,
+                    callback: EventCallback::Stone,
                     building: None,
                 });
             }
