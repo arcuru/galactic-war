@@ -7,6 +7,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// An Island in the world
+#[derive(Debug, Default)]
 pub struct Island {
     /// List of events that are happening on the island
     events: Vec<Event>,
@@ -16,6 +17,7 @@ pub struct Island {
     buildings: Vec<Building>,
 }
 
+#[derive(Debug)]
 struct Building {
     name: BuildingType,
     level: usize,
@@ -333,7 +335,7 @@ impl Island {
         tick: usize,
         world_config: &WorldConfig,
         building: BuildingType,
-    ) -> Result<(), String> {
+    ) -> Result<Event, String> {
         self.process_events(tick, world_config);
         if self.building(building).is_some() {
             // Verify if the building can be built
@@ -348,12 +350,13 @@ impl Island {
                 self.lumber -= cost.get("lumber").unwrap_or(&0);
                 self.stone -= cost.get("stone").unwrap_or(&0);
                 // Increase the level
-                self.register_event(Event {
+                let event = Event {
                     completion: tick + cost.get("time").unwrap_or(&1),
                     action: EventCallback::Build,
                     building: Some(building),
-                });
-                Ok(())
+                };
+                self.register_event(event.clone());
+                Ok(event)
             } else {
                 // Not enough resources
                 Err("Not enough resources".to_string())
@@ -426,7 +429,7 @@ impl Island {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct BuildingConfig {
     /// Starting level for this type of building
     /// If not provided it is 0
@@ -444,7 +447,7 @@ pub struct BuildingConfig {
 }
 
 /// Configuration for the creation of an island
-#[derive(Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct IslandConfig {
     /// List of buildings that will be built on the island
     pub buildings: HashMap<String, BuildingConfig>,

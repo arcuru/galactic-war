@@ -1,4 +1,4 @@
-use island::{EventInfo};
+use island::EventInfo;
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -6,8 +6,9 @@ use std::collections::HashMap;
 mod island;
 use crate::island::Island;
 
-pub use crate::island::{BuildingType, IslandConfig};
+pub use crate::island::{BuildingType, Event, IslandConfig};
 
+#[derive(Debug)]
 pub struct World {
     /// Cached configuration for the world
     config: WorldConfig,
@@ -22,7 +23,7 @@ pub struct World {
 }
 
 /// Configuration for the world
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct WorldConfig {
     /// Static Island Count
     pub island_count: usize,
@@ -34,7 +35,7 @@ pub struct WorldConfig {
     pub islands: IslandConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct WorldSize {
     pub x: usize,
     pub y: usize,
@@ -43,14 +44,14 @@ pub struct WorldSize {
 /// Production of an island
 ///
 /// Each value is the number of ticks needed to produce each resource
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct IslandProduction {
     pub gold: usize,
     pub lumber: usize,
     pub stone: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct IslandInfo {
     pub score: usize,
     pub gold: usize,
@@ -67,7 +68,7 @@ pub struct IslandInfo {
 }
 
 /// Struct to hold the cost for a build
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Cost {
     pub gold: usize,
     pub lumber: usize,
@@ -78,7 +79,7 @@ pub struct Cost {
 /// Info for a specific Building
 ///
 /// Lots of details are optional, as they don't all apply to all buildings
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BuildingInfo {
     pub level: usize,
     pub production: Option<IslandProduction>,
@@ -155,7 +156,7 @@ impl World {
         tick: usize,
         (x, y): (usize, usize),
         building: BuildingType,
-    ) -> Result<(), String> {
+    ) -> Result<Event, String> {
         self.update_tick(tick)?;
         let island = self.islands.get_mut(&(x, y)).unwrap();
         island.build(tick, &self.config, building)
