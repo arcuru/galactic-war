@@ -39,6 +39,35 @@ pub struct WorldSize {
     pub y: usize,
 }
 
+/// Production of an island
+///
+/// Each value is the number of ticks needed to produce each resource
+#[derive(Debug)]
+pub struct IslandProduction {
+    pub gold: usize,
+    pub lumber: usize,
+    pub stone: usize,
+}
+
+#[derive(Debug)]
+pub struct IslandInfo {
+    pub score: usize,
+    pub gold: usize,
+    pub lumber: usize,
+    pub stone: usize,
+    pub production: IslandProduction,
+    /// Building levels
+    pub buildings: HashMap<BuildingType, usize>,
+}
+
+/// Info to use in return values
+///
+/// Stores IslandInfo, and will store details about buildings in the future
+#[derive(Debug)]
+pub enum Details {
+    Island(IslandInfo),
+}
+
 impl World {
     /// Create a new World
     ///
@@ -59,6 +88,18 @@ impl World {
             islands,
             tick: initial_tick,
         }
+    }
+
+    /// Retrieve the details of an island, possibly scoped to a specific building
+    pub fn get_details(
+        &mut self,
+        tick: usize,
+        (x, y): (usize, usize),
+        building: Option<BuildingType>,
+    ) -> Result<Details, String> {
+        self.update_tick(tick)?;
+        let island = self.islands.get_mut(&(x, y)).unwrap();
+        island.get_details(tick, &self.config, building)
     }
 
     /// Return basic stats about the World

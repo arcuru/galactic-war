@@ -2,7 +2,7 @@ use core::panic;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::WorldConfig;
+use crate::{Details, IslandInfo, IslandProduction, WorldConfig};
 use std::fmt;
 
 /// An Island in the world
@@ -33,7 +33,7 @@ enum EventCallback {
     Build,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuildingType {
     Fortress,
     GoldPit,
@@ -103,6 +103,22 @@ impl Island {
             .buildings
             .get(&building.to_string().to_lowercase())
             .unwrap()
+    }
+
+    /// Get the production of the island
+    fn get_production(&mut self, tick: usize, world_config: &WorldConfig) -> IslandProduction {
+        self.process_events(tick, world_config);
+        // Get the gold production
+        let gold = {
+            let config = Island::get_building_config(world_config, BuildingType::GoldPit);
+            config.production.as_ref().unwrap()[self.building_level(BuildingType::GoldPit)]
+        };
+
+        IslandProduction {
+            gold,
+            lumber: 0,
+            stone: 0,
+        }
     }
 
     /// Callback for events
@@ -235,6 +251,32 @@ impl Island {
         } else {
             // Building does not exist
             Err("Building not found".to_string())
+        }
+    }
+
+    /// Get the details of the island
+    pub fn get_details(
+        &mut self,
+        tick: usize,
+        world_config: &WorldConfig,
+        building: Option<BuildingType>,
+    ) -> Result<Details, String> {
+        self.process_events(tick, world_config);
+        if building.is_some() {
+            Err("Building details not implemented".to_string())
+        } else {
+            let mut details = IslandInfo {
+                score: self.score(tick, world_config),
+                gold: self.gold,
+                lumber: self.lumber,
+                stone: self.stone,
+                buildings: HashMap::new(),
+                production: self.get_production(tick, world_config),
+            };
+            for building in self.buildings.iter() {
+                details.buildings.insert(building.name, building.level);
+            }
+            Ok(Details::Island(details))
         }
     }
 }

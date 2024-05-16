@@ -30,5 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         BuildingType::GoldPit,
     )?;
     println!("{}", world.stats(302)?);
+    println!(
+        "{:?}",
+        world.get_details(302, *world.islands().keys().next().unwrap(), None)?
+    );
     Ok(())
 }
