@@ -8,13 +8,14 @@ pub struct Island {
     /// List of events that are happening on the island
     events: Vec<Event>,
     gold: usize,
-    _lumber: usize,
-    _stone: usize,
-    buildings: Buildings,
+    lumber: usize,
+    stone: usize,
+    buildings: Vec<Building>,
 }
 
-struct Buildings {
-    goldpit: usize,
+struct Building {
+    name: BuildingType,
+    level: usize,
 }
 
 #[derive(Clone)]
@@ -28,6 +29,18 @@ enum EventCallback {
     Gold,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BuildingType {
+    Fortress,
+    GoldPit,
+    StoneBasin,
+    Sawmill,
+    Garrison,
+    Warehouse,
+    Barricade,
+    WatchTower,
+}
+
 impl Island {
     /// Create a new island
     pub fn new(tick: usize, config: &IslandConfig) -> Self {
@@ -38,40 +51,85 @@ impl Island {
             completion: tick + 10,
             callback: EventCallback::Gold,
         }];
+        let buildings = vec![Building {
+            name: BuildingType::GoldPit,
+            level: config
+                .buildings
+                .get("goldpit")
+                .unwrap()
+                .starting_level
+                .unwrap_or(0),
+        }];
         Self {
             events,
             gold,
-            _lumber: lumber,
-            _stone: stone,
-            buildings: Buildings { goldpit: 0 },
+            lumber,
+            stone,
+            buildings,
         }
     }
 
-    /// Callback for the goldpit, increase the gold amount by one and create a new callback
-    fn goldpit_callback(
-        tick: usize,
-        world_config: &WorldConfig,
-        island: &mut Island,
-    ) -> Option<Event> {
-        // Get the time needed to produce a gold piece from the WorldConfig
-        let time = world_config
-            .islands
-            .buildings
-            .get("goldpit")
-            .unwrap()
-            .production
-            .as_ref()
-            .unwrap()[island.buildings.goldpit];
-        island.gold += 1;
-        Some(Event {
-            completion: tick + time,
-            callback: EventCallback::Gold,
-        })
+    /// Get the index of the building by type
+    ///
+    /// The building may not exist, so it returns an Option
+    fn building(&self, building: BuildingType) -> Option<usize> {
+        self.buildings.iter().position(|b| b.name == building)
     }
 
+    /// Get the level of a building
+    fn building_level(&self, building: BuildingType) -> usize {
+        if let Some(index) = self.building(building) {
+            self.buildings[index].level
+        } else {
+            0
+        }
+    }
+
+    /// Callback for events
+    ///
+    /// This will process the event and update the state of the island.
+    /// It will also create new events if needed.
+    fn event_callback(&mut self, tick: usize, world_config: &WorldConfig, event: Event) {
+        // Check the completion time
+        if event.completion > tick {
+            return;
+        }
+        match event.callback {
+            EventCallback::Gold => {
+                self.gold += 1;
+                // Create a new event for the next gold piece
+                let time = world_config
+                    .islands
+                    .buildings
+                    .get("goldpit")
+                    .unwrap()
+                    .production
+                    .as_ref()
+                    .unwrap()[self.building_level(BuildingType::GoldPit)];
+                self.register_event(Event {
+                    completion: event.completion + time,
+                    callback: EventCallback::Gold,
+                });
+            }
+        }
+    }
+
+    /// Get the current gold amount
     pub fn gold(&mut self, tick: usize, world_config: &WorldConfig) -> usize {
         self.process_events(tick, world_config);
         self.gold
+    }
+
+    /// Get the current lumber amount
+    pub fn lumber(&mut self, tick: usize, world_config: &WorldConfig) -> usize {
+        self.process_events(tick, world_config);
+        self.lumber
+    }
+
+    /// Get the current stone amount
+    pub fn stone(&mut self, tick: usize, world_config: &WorldConfig) -> usize {
+        self.process_events(tick, world_config);
+        self.stone
     }
 
     /// Check if there is an event that needs to be processed
@@ -101,15 +159,7 @@ impl Island {
             for event in events.iter() {
                 if event.completion <= tick {
                     dirty = true;
-                    match event.callback {
-                        EventCallback::Gold => {
-                            if let Some(new_event) =
-                                Self::goldpit_callback(event.completion, world_config, self)
-                            {
-                                self.register_event(new_event);
-                            }
-                        }
-                    }
+                    self.event_callback(tick, world_config, event.clone());
                 } else {
                     self.register_event(event.clone());
                 }
@@ -120,14 +170,27 @@ impl Island {
     /// Get the score of an island
     pub fn score(&mut self, tick: usize, world_config: &WorldConfig) -> usize {
         self.process_events(tick, world_config);
-        self.buildings.goldpit
+        // Sum the levels of each building
+        // This is not the same as IK
+        self.buildings.iter().map(|b| b.level).sum()
     }
 
     /// Build a building
-    pub fn build_goldpit(&mut self, tick: usize, world_config: &WorldConfig) {
+    pub fn build(
+        &mut self,
+        tick: usize,
+        world_config: &WorldConfig,
+        building: BuildingType,
+    ) -> Result<(), String> {
         self.process_events(tick, world_config);
-        self.buildings.goldpit += 1;
-        // FIXME: this should modify the currently producing gold piece event
+        if let Some(index) = self.building(building) {
+            // TODO: Add a build time, this effectively builds instantly and ignores in-flight production events
+            self.buildings[index].level += 1;
+            Ok(())
+        } else {
+            // Building does not exist
+            Err("Building not found".to_string())
+        }
     }
 }
 

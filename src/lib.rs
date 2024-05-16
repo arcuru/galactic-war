@@ -5,7 +5,7 @@ use std::collections::HashMap;
 mod island;
 use crate::island::Island;
 
-pub use crate::island::IslandConfig;
+pub use crate::island::{BuildingType, IslandConfig};
 
 pub struct World {
     config: WorldConfig,
@@ -68,9 +68,14 @@ impl World {
         &self.islands
     }
 
-    /// Build a goldpit on an island
-    pub fn build_goldpit(&mut self, tick: usize, (x, y): (usize, usize)) {
+    /// Build a building on an island
+    pub fn build(
+        &mut self,
+        tick: usize,
+        (x, y): (usize, usize),
+        building: BuildingType,
+    ) -> Result<(), String> {
         let island = self.islands.get_mut(&(x, y)).unwrap();
-        island.build_goldpit(tick, &self.config);
+        island.build(tick, &self.config, building)
     }
 }
