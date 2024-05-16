@@ -96,6 +96,15 @@ impl Island {
         }
     }
 
+    /// Get the building configuration from the WorldConfig
+    fn get_building_config(world_config: &WorldConfig, building: BuildingType) -> &BuildingConfig {
+        world_config
+            .islands
+            .buildings
+            .get(&building.to_string().to_lowercase())
+            .unwrap()
+    }
+
     /// Callback for events
     ///
     /// This will process the event and update the state of the island.
@@ -109,11 +118,7 @@ impl Island {
             EventCallback::Gold => {
                 self.gold += 1;
                 // Create a new event for the next gold piece
-                let time = world_config
-                    .islands
-                    .buildings
-                    .get("goldpit")
-                    .unwrap()
+                let time = Island::get_building_config(world_config, BuildingType::GoldPit)
                     .production
                     .as_ref()
                     .unwrap()[self.building_level(BuildingType::GoldPit)];
@@ -204,14 +209,10 @@ impl Island {
         building: BuildingType,
     ) -> Result<(), String> {
         self.process_events(tick, world_config);
-        if let Some(index) = self.building(building) {
+        if self.building(building).is_some() {
             // Verify if the building can be built
-            let cost = &world_config
-                .islands
-                .buildings
-                .get(&self.buildings[index].name.to_string().to_lowercase())
-                .unwrap()
-                .cost[self.building_level(building)];
+            let cost = &Island::get_building_config(world_config, building).cost
+                [self.building_level(building)];
             if self.gold >= *cost.get("gold").unwrap_or(&0)
                 && self.lumber >= *cost.get("lumber").unwrap_or(&0)
                 && self.stone >= *cost.get("stone").unwrap_or(&0)
