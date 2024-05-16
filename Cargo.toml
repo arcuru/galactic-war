@@ -1,0 +1,8 @@
+[package]
+name = "islandfight"
+version = "0.1.0"
+edition = "2021"
+description = "A casual game based on the classic Inselkampf"
+
+[dependencies]
+rand = "0.8.4"
