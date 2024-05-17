@@ -5,12 +5,12 @@ edition = "2021"
 description = "A casual game based on the classic Inselkampf"
 
 [dependencies]
-rand = "0.8.4"
-serde = { version = "1.0.202", features = ["derive"] }
-serde_yaml = { version = "0.9.33", optional = true }
-axum = { version = "0.7.5", optional = true }
-tokio = { version = "1.37.0", features = ["full"], optional = true }
-lazy_static = { version = "1.4.0", optional = true }
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = { version = "0.9", optional = true }
+axum = { version = "0.7", optional = true }
+tokio = { version = "1.37", features = ["full"], optional = true }
+lazy_static = { version = "1.4", optional = true }
 
 [features]
 default = []
