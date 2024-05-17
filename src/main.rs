@@ -328,8 +328,8 @@ async fn world_stats_get(Path(world): Path<String>) -> Result<Html<String>, Stri
                     }
                 }
                 page.push_str(&format!(
-                "<tr><td bgcolor=#ffffff><a href=/{}/{}/{}>{} ({}:{})</a></td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff></td><td bgcolor=#00FF00 title={}>{}</td></tr>",
-                world, addr.x, addr.y, "Island", addr.x, addr.y, info.gold, info.stone, info.lumber, "", ""
+                "<tr><td bgcolor=#ffffff><a href=/{}/{}/{}>{} ({}:{})</a></td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff title=\"{}\">{}</td></tr>",
+                world, addr.x, addr.y, "Island", addr.x, addr.y, info.gold, info.stone, info.lumber, activity_hover, activity
             ));
             }
             _ => {
