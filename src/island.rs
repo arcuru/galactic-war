@@ -1,8 +1,8 @@
 use core::panic;
-use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::{BuildingInfo, Cost, Details, IslandInfo, IslandProduction, WorldConfig};
+use crate::config::{BuildingConfig, IslandConfig, WorldConfig};
+use crate::{BuildingInfo, Cost, Details, IslandInfo, IslandProduction};
 use std::fmt;
 use std::str::FromStr;
 
@@ -427,31 +427,4 @@ impl Island {
             Ok(Details::Island(details))
         }
     }
-}
-
-#[derive(Debug, Default, Deserialize)]
-pub struct BuildingConfig {
-    /// Starting level for this type of building
-    /// If not provided it is 0
-    pub starting_level: Option<usize>,
-
-    /// Used for Gold/Stone/Lumber
-    ///
-    /// The number of ticks needed to produce the resource at a level
-    pub production: Option<Vec<usize>>,
-
-    /// Cost for each level
-    /// They are the costs to level up from the current level to the next level
-    /// The first element is the cost to level up from 0 to 1
-    pub cost: Vec<HashMap<String, usize>>,
-}
-
-/// Configuration for the creation of an island
-#[derive(Debug, Default, Deserialize)]
-pub struct IslandConfig {
-    /// List of buildings that will be built on the island
-    pub buildings: HashMap<String, BuildingConfig>,
-
-    /// Starting resources for the island
-    pub resources: HashMap<String, usize>,
 }

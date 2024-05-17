@@ -1,5 +1,7 @@
 use axum::response::Html;
-use islandfight::{BuildingType, Details, Event, EventCallback, IslandInfo, World, WorldConfig};
+use islandfight::{
+    config::WorldConfig, BuildingType, Details, Event, EventCallback, IslandInfo, World,
+};
 
 use axum::{extract::Path, routing::get, Router};
 use std::str::FromStr;

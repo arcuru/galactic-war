@@ -1,12 +1,13 @@
 use island::EventInfo;
 use rand::Rng;
-use serde::Deserialize;
 use std::collections::HashMap;
 
+pub mod config;
 mod island;
+use crate::config::WorldConfig;
 use crate::island::Island;
 
-pub use crate::island::{BuildingType, Event, EventCallback, IslandConfig};
+pub use crate::island::{BuildingType, Event, EventCallback};
 
 #[derive(Debug)]
 pub struct World {
@@ -20,25 +21,6 @@ pub struct World {
     ///
     /// This is used to ensure that events can only arrive in order
     tick: usize,
-}
-
-/// Configuration for the world
-#[derive(Debug, Deserialize, Default)]
-pub struct WorldConfig {
-    /// Static Island Count
-    pub island_count: usize,
-
-    /// World size
-    pub size: WorldSize,
-
-    /// Island Config
-    pub islands: IslandConfig,
-}
-
-#[derive(Debug, Deserialize, Default)]
-pub struct WorldSize {
-    pub x: usize,
-    pub y: usize,
 }
 
 /// Production of an island
