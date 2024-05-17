@@ -6,6 +6,7 @@ use islandfight::{
 use axum::{extract::Path, routing::get, Router};
 use std::str::FromStr;
 use std::{
+    cmp::max,
     collections::HashMap,
     sync::{Arc, Mutex},
 };
@@ -44,7 +45,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // A GET request will just display an HTML page, and a POST request will return the data being used to display
     // Internally all GET requests use the same data as returned from the POST request
     let app = Router::new()
-        .route("/", get(base_get))
+        .route("/:world", get(world_get).post(world_post))
         .route("/:world/stats", get(world_stats_get).post(world_stats_post))
         .route(
             "/:world/create",
@@ -52,6 +53,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         )
         .route("/:world/:x/:y", get(island_get).post(island_post))
         .route("/:world/:x/:y/", get(island_get).post(island_post))
+        .route("/:world/:x/:y/fortress", get(fortress_get))
         .route(
             "/:world/:x/:y/:building",
             get(building_get).post(building_post),
@@ -60,9 +62,9 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "/:world/:x/:y/:building/build",
             get(build_building_get).post(build_building_post),
         )
-        .route("/:world", get(world_get).post(world_post));
+        .route("/", get(base_get));
 
-    // run our app with hyper, listening globally on port 3000
+    // Hardcode serve on port 3050
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3050").await.unwrap();
     axum::serve(listener, app).await?;
     Ok(())
@@ -136,6 +138,99 @@ async fn world_create_post(Path(world): Path<String>) -> String {
     format!("World {} created", world)
 }
 
+/// Handler for GET requests to /:world/:x/:y/fortress
+async fn fortress_get(
+    Path((world, x, y)): Path<(String, usize, usize)>,
+) -> Result<Html<String>, String> {
+    let dets = building_info(&world, (x, y), "Fortress");
+
+    let island_info = island_info(&world, (x, y)).unwrap();
+    let mut page = resource_table(island_info.gold, island_info.stone, island_info.lumber);
+
+    // Push the table header
+    page.push_str("<p><table width=600 border=0 cellspacing=1 cellpadding=3>");
+
+    let building_costs = match dets.unwrap() {
+        Details::Building(info) => info.builds.unwrap(),
+        _ => {
+            return Err("Unexpected Details type".to_string());
+        }
+    };
+
+    for (building, cost) in building_costs.iter() {
+        let level = island_info.buildings.get(building).unwrap_or(&0);
+        page.push_str(&format!(
+            "<tr><td bgcolor=dddddd>🛖 
+            <a href=/{}/{}/{}/{}>{} (level {})</a>",
+            world,
+            x,
+            y,
+            building.to_string().to_lowercase(),
+            building,
+            level
+        ));
+
+        page.push_str(&format!(
+            "<br>Cost: 💰{}/🪨{}/🪵{}   Duration: {}</td>",
+            cost.gold,
+            cost.stone,
+            cost.lumber,
+            seconds_to_readable(cost.ticks)
+        ));
+
+        if island_info.gold >= cost.gold
+            && island_info.stone >= cost.stone
+            && island_info.lumber >= cost.lumber
+        {
+            page.push_str(&format!(
+                "<td bgcolor=dddddd width=200><a href=/{}/{}/{}/{}/build>Upgrade to level {}</a></td></tr>",
+                world, x, y, building.to_string().to_lowercase(), level + 1));
+        } else {
+            // Figure out how long it will take to produce the missing resources at the current rate
+            let gold_time = {
+                let gold = cost.gold as isize - island_info.gold as isize;
+                if gold > 0 {
+                    gold as usize * island_info.production.gold
+                } else {
+                    0
+                }
+            };
+            let stone_time = {
+                let stone = cost.stone as isize - island_info.stone as isize;
+                if stone > 0 {
+                    stone as usize * island_info.production.stone
+                } else {
+                    0
+                }
+            };
+            let lumber_time = {
+                let lumber = cost.lumber as isize - island_info.lumber as isize;
+                if lumber > 0 {
+                    lumber as usize * island_info.production.lumber
+                } else {
+                    0
+                }
+            };
+            // Find the longest time to produce the missing resources, and the name of the typpe
+            let time = max(gold_time, max(stone_time, lumber_time));
+            let resource = if time == gold_time {
+                "💰"
+            } else if time == stone_time {
+                "🪨"
+            } else {
+                "🪵"
+            };
+
+            page.push_str(&format!(
+                "<td bgcolor=dddddd width=200>Upgrade available in<br>~{} (Need {})</td></tr>",
+                seconds_to_readable(time),
+                resource
+            ));
+        }
+    }
+    Ok(Html::from(page.to_string()))
+}
+
 /// Answer a GET request to the building endpoint
 ///
 /// TODO: This should respond with an actual HTML page
@@ -181,18 +276,21 @@ fn building_info(world: &str, (x, y): (usize, usize), building: &str) -> Result<
     }
 }
 
+/// Return a standardized HTML table for displaying resources
+fn resource_table(gold: usize, stone: usize, lumber: usize) -> String {
+    format!("<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td width=33%>💰 {}</td><td width=33%>🪨 {}</td><td>🪵 {}</td></tr></table>",
+gold, stone, lumber)
+}
+
 /// Handler for GET requests to /:world/:x/:y
 async fn island_get(
     Path((world, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
     let island_info = island_info(&world, (x, y))?;
 
-    let mut page = format!("
-<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td width=33%>💰 {}</td>
-<td width=33%>🪨 {}</td><td>🪵 {}</td></tr></table>
-<br>
-<table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Buildings</b><br><font color=#CCCCC><b>
-", island_info.gold, island_info.stone, island_info.lumber);
+    let mut page = format!("{}<br>
+<table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Buildings</b><br><font color=#CCCCC><b>",
+resource_table(island_info.gold, island_info.stone, island_info.lumber));
 
     for (building, level) in island_info.buildings.iter() {
         page.push_str(&format!(
@@ -308,24 +406,11 @@ async fn world_stats_get(Path(world): Path<String>) -> Result<Html<String>, Stri
                     if let EventCallback::Build = event.action {
                         activity.push_str("🏗️");
                         let eta = event.completion - tick();
-                        let eta_h = eta / 3600;
-                        let eta_m = (eta % 3600) / 60;
-                        let eta_s = eta % 60;
-                        let mut eta_str = String::new();
-                        if eta_h > 0 {
-                            eta_str.push_str(&format!("{}:", eta_h));
-                        }
-                        if eta_m > 0 || eta_h > 0 {
-                            eta_str.push_str(&format!("{:02}:", eta_m));
-                        }
-                        if eta_s > 0 || eta_m > 0 || eta_h > 0 {
-                            eta_str.push_str(&format!("{:02}", eta_s));
-                        }
 
                         activity_hover.push_str(&format!(
                             "Building {}: {} remaining",
                             event.building.unwrap(),
-                            eta_str
+                            seconds_to_readable(eta)
                         ));
                     }
                 }
@@ -389,5 +474,17 @@ fn world_info(world: &str) -> Result<Vec<(Coords, Details)>, String> {
         Ok(island_info)
     } else {
         Err("World not found".to_string())
+    }
+}
+
+/// Convert seconds into a human readable format
+fn seconds_to_readable(seconds: usize) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let seconds = seconds % 60;
+    if hours > 0 {
+        format!("{}:{:02}:{:02}", hours, minutes, seconds)
+    } else {
+        format!("{:2}:{:02}", minutes, seconds)
     }
 }
