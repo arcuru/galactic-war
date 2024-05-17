@@ -44,3 +44,15 @@ islands:
         - gold: 30
         - gold: 40
           time: 1
+    fortress:
+      starting_level: 1
+      cost:
+        - gold: 10
+          stone: 0
+          time: 100
+        - gold: 20
+          stone: 0
+          time: 1
+        - gold: 30
+        - gold: 40
+          time: 1

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 mod island;
 use crate::island::Island;
 
-pub use crate::island::{BuildingType, Event, IslandConfig};
+pub use crate::island::{BuildingType, Event, EventCallback, IslandConfig};
 
 #[derive(Debug)]
 pub struct World {

@@ -25,9 +25,9 @@ struct Building {
 
 #[derive(Clone, Debug)]
 pub struct Event {
-    completion: usize,
-    action: EventCallback,
-    building: Option<BuildingType>,
+    pub completion: usize,
+    pub action: EventCallback,
+    pub building: Option<BuildingType>,
 }
 
 pub type EventInfo = Event;
