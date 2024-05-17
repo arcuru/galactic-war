@@ -60,4 +60,8 @@ tasks:
     sources:
       - ./**/*.rs
       - ./Cargo*
-    cmd: cargo build
+    cmd: cargo build --bin islandfight --features cli
+  run:
+    desc: Run the binary
+    aliases: [r]
+    cmd: cargo run --bin islandfight --features cli

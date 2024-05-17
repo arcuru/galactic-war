@@ -7,7 +7,16 @@ description = "A casual game based on the classic Inselkampf"
 [dependencies]
 rand = "0.8.4"
 serde = { version = "1.0.202", features = ["derive"] }
-serde_yaml = "0.9.33"
-axum = "0.7.5"
-tokio = { version = "1.37.0", features = ["full"] }
-lazy_static = "1.4.0"
+serde_yaml = { version = "0.9.33", optional = true }
+axum = { version = "0.7.5", optional = true }
+tokio = { version = "1.37.0", features = ["full"], optional = true }
+lazy_static = { version = "1.4.0", optional = true }
+
+[features]
+default = []
+cli = ["axum", "serde_yaml", "tokio", "lazy_static"]
+
+[[bin]]
+name = "islandfight"
+path = "src/main.rs"
+required-features = ["cli"]
