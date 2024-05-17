@@ -9,10 +9,11 @@ islands:
     goldpit:
       starting_level: 0
       # These are the number of ticks it takes to produce 1 gold at a given level
-      production: [10, 1, 1, 1, 1]
+      production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
       cost:
         - gold: 10
-          stone: 0
+          stone: 1
+          lumber: 3
           time: 100
         - gold: 20
           stone: 0
@@ -21,7 +22,7 @@ islands:
         - gold: 40
           time: 1
     sawmill:
-      production: [10, 1, 1, 1, 1]
+      production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
       cost:
         - gold: 10
           stone: 0
@@ -33,7 +34,7 @@ islands:
         - gold: 40
           time: 1
     stonebasin:
-      production: [10, 1, 1, 1, 1]
+      production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
       cost:
         - gold: 1
           stone: 1
