@@ -61,8 +61,8 @@ tasks:
     sources:
       - ./**/*.rs
       - ./Cargo*
-    cmd: cargo build --bin islandfight --features cli
+    cmd: cargo build --bin galactic-war --features cli
   run:
     desc: Run the binary
     aliases: [r]
-    cmd: cargo run --bin islandfight --features cli
+    cmd: cargo run --bin galactic-war --features cli

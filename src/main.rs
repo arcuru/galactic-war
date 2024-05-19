@@ -1,6 +1,6 @@
 use axum::response::Html;
-use islandfight::{
-    config::WorldConfig, BuildingType, Details, Event, EventCallback, IslandInfo, World,
+use galactic_war::{
+    config::GalaxyConfig, Details, Event, EventCallback, Galaxy, StructureType, SystemInfo,
 };
 
 use axum::{extract::Path, routing::get, Router};
@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-/// Coords for islands
+/// Coords for systems
 ///
 /// TODO: Integrate this everywhere
 struct Coords {
@@ -20,47 +20,50 @@ struct Coords {
 }
 
 lazy_static::lazy_static! {
-    // Safely share the worlds between threads
-    static ref WORLDS: Arc<Mutex<HashMap<String, World>>> = Arc::new(Mutex::new(HashMap::new()));
+    // Safely share the galaxies between threads
+    static ref GALAXIES: Arc<Mutex<HashMap<String, Galaxy>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let contents = include_str!("../worlds/classic.yaml");
-    let world_config: WorldConfig = serde_yaml::from_str(contents).unwrap();
+    let contents = include_str!("../galaxies/classic.yaml");
+    let galaxy_config: GalaxyConfig = serde_yaml::from_str(contents).unwrap();
 
-    // Create a new world named "one"
+    // Create a new galaxy named "one"
     {
-        let mut worlds = WORLDS.lock().unwrap();
-        worlds.insert("one".to_string(), World::new(world_config, tick()));
+        let mut galaxies = GALAXIES.lock().unwrap();
+        galaxies.insert("one".to_string(), Galaxy::new(galaxy_config, tick()));
     }
 
     serve().await
 }
 
-/// Serve the World(s) over HTTP
+/// Serve the Galaxy(s) over HTTP
 async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // All the entry points expose both a GET and POST interface
     // The difference is just in presentation
     // A GET request will just display an HTML page, and a POST request will return the data being used to display
     // Internally all GET requests use the same data as returned from the POST request
     let app = Router::new()
-        .route("/:world", get(world_get).post(world_post))
-        .route("/:world/stats", get(world_stats_get).post(world_stats_post))
+        .route("/:galaxy", get(galaxy_get).post(galaxy_post))
         .route(
-            "/:world/create",
-            get(world_create_get).post(world_create_post),
-        )
-        .route("/:world/:x/:y", get(island_get).post(island_post))
-        .route("/:world/:x/:y/", get(island_get).post(island_post))
-        .route("/:world/:x/:y/fortress", get(fortress_get))
-        .route(
-            "/:world/:x/:y/:building",
-            get(building_get).post(building_post),
+            "/:galaxy/stats",
+            get(galaxy_stats_get).post(galaxy_stats_post),
         )
         .route(
-            "/:world/:x/:y/:building/build",
-            get(build_building_get).post(build_building_post),
+            "/:galaxy/create",
+            get(galaxy_create_get).post(galaxy_create_post),
+        )
+        .route("/:galaxy/:x/:y", get(system_get).post(system_post))
+        .route("/:galaxy/:x/:y/", get(system_get).post(system_post))
+        .route("/:galaxy/:x/:y/fortress", get(fortress_get))
+        .route(
+            "/:galaxy/:x/:y/:structure",
+            get(structure_get).post(structure_post),
+        )
+        .route(
+            "/:galaxy/:x/:y/:structure/build",
+            get(build_structure_get).post(build_structure_post),
         )
         .route("/", get(base_get));
 
@@ -83,36 +86,36 @@ fn tick() -> usize {
 async fn base_get() -> Html<String> {
     let mut page = r#"
 <head>
-    <title>Welcome to Island Fight</title>
+    <title>Galactic War</title>
     <script>
         function navigate() {
-            var selectedWorld = document.getElementById("worlds").value;
-            window.location.href = "/" + selectedWorld;
+            var selectedGalaxy = document.getElementById("galaxies").value;
+            window.location.href = "/" + selectedGalaxy;
         }
         window.onload = function() {
-            document.getElementById("createWorld").onsubmit = function() {
-                var worldName = document.getElementById("newWorld").value;
-                this.action = "/" + worldName + "/create";
+            document.getElementById("createGalaxy").onsubmit = function() {
+                var galaxyName = document.getElementById("newGalaxy").value;
+                this.action = "/" + galaxyName + "/create";
             }
         }
     </script>
 </head>
 <body>
-    <h1>Welcome to Island Fight!</h1>
-    <select id="worlds">
+    <h1>Galactic War</h1>
+    <select id="galaxies">
     "#
     .to_string();
-    for world in WORLDS.lock().unwrap().keys() {
-        page.push_str(&format!("<option value=\"{}\">{}</option>", world, world));
+    for galaxy in GALAXIES.lock().unwrap().keys() {
+        page.push_str(&format!("<option value=\"{}\">{}</option>", galaxy, galaxy));
     }
     page.push_str(
         r#"</select>
-    <button onclick="navigate()">Go to world</button>
+    <button onclick="navigate()">Go to galaxy</button>
     <br><br>
-    <h1>Create a new world</h1>
-    <form id="createWorld" method="post">
-        <label for="newWorld">Enter New World Name:</label>
-        <input type="text" id="newWorld" name="newWorld" required>
+    <h1>Create a new galaxy</h1>
+    <form id="createGalaxy" method="post">
+        <label for="newGalaxy">Enter New Galaxy Name:</label>
+        <input type="text" id="newGalaxy" name="newGalaxy" required>
         <input type="submit" value="Submit">
     </form>
 </body>
@@ -121,52 +124,52 @@ async fn base_get() -> Html<String> {
     Html::from(page)
 }
 
-/// Handler for GET requests to /:world/create
-async fn world_create_get(Path(world): Path<String>) -> String {
-    world_create_post(Path(world)).await
+/// Handler for GET requests to /:galaxy/create
+async fn galaxy_create_get(Path(galaxy): Path<String>) -> String {
+    galaxy_create_post(Path(galaxy)).await
 }
 
-/// Handler for POST requests to /:world/create
-async fn world_create_post(Path(world): Path<String>) -> String {
-    let mut worlds = WORLDS.lock().unwrap();
-    if worlds.contains_key(&world) {
-        return format!("World {} already exists", world);
+/// Handler for POST requests to /:galaxy/create
+async fn galaxy_create_post(Path(galaxy): Path<String>) -> String {
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if galaxies.contains_key(&galaxy) {
+        return format!("Galaxy {} already exists", galaxy);
     }
-    let contents = include_str!("../worlds/classic.yaml");
-    let world_config: WorldConfig = serde_yaml::from_str(contents).unwrap();
-    worlds.insert(world.clone(), World::new(world_config, tick()));
-    format!("World {} created", world)
+    let contents = include_str!("../galaxies/classic.yaml");
+    let galaxy_config: GalaxyConfig = serde_yaml::from_str(contents).unwrap();
+    galaxies.insert(galaxy.clone(), Galaxy::new(galaxy_config, tick()));
+    format!("Galaxy {} created", galaxy)
 }
 
-/// Handler for GET requests to /:world/:x/:y/fortress
+/// Handler for GET requests to /:galaxy/:x/:y/fortress
 async fn fortress_get(
-    Path((world, x, y)): Path<(String, usize, usize)>,
+    Path((galaxy, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
-    let dets = building_info(&world, (x, y), "Fortress");
+    let dets = structure_info(&galaxy, (x, y), "Fortress");
 
-    let island_info = island_info(&world, (x, y)).unwrap();
-    let mut page = resource_table(island_info.gold, island_info.stone, island_info.lumber);
+    let system_info = system_info(&galaxy, (x, y)).unwrap();
+    let mut page = resource_table(system_info.gold, system_info.stone, system_info.lumber);
 
     // Push the table header
     page.push_str("<p><table width=600 border=0 cellspacing=1 cellpadding=3>");
 
-    let building_costs = match dets.unwrap() {
-        Details::Building(info) => info.builds.unwrap(),
+    let structure_costs = match dets.unwrap() {
+        Details::Structure(info) => info.builds.unwrap(),
         _ => {
             return Err("Unexpected Details type".to_string());
         }
     };
 
-    for (building, cost) in building_costs.iter() {
-        let level = island_info.buildings.get(building).unwrap_or(&0);
+    for (structure, cost) in structure_costs.iter() {
+        let level = system_info.structures.get(structure).unwrap_or(&0);
         page.push_str(&format!(
             "<tr><td bgcolor=dddddd>🛖 
             <a href=/{}/{}/{}/{}>{} (level {})</a>",
-            world,
+            galaxy,
             x,
             y,
-            building.to_string().to_lowercase(),
-            building,
+            structure.to_string().to_lowercase(),
+            structure,
             level
         ));
 
@@ -178,35 +181,35 @@ async fn fortress_get(
             seconds_to_readable(cost.ticks)
         ));
 
-        if island_info.gold >= cost.gold
-            && island_info.stone >= cost.stone
-            && island_info.lumber >= cost.lumber
+        if system_info.gold >= cost.gold
+            && system_info.stone >= cost.stone
+            && system_info.lumber >= cost.lumber
         {
             page.push_str(&format!(
                 "<td bgcolor=dddddd width=200><a href=/{}/{}/{}/{}/build>Upgrade to level {}</a></td></tr>",
-                world, x, y, building.to_string().to_lowercase(), level + 1));
+                galaxy, x, y, structure.to_string().to_lowercase(), level + 1));
         } else {
             // Figure out how long it will take to produce the missing resources at the current rate
             let gold_time = {
-                let gold = cost.gold as isize - island_info.gold as isize;
+                let gold = cost.gold as isize - system_info.gold as isize;
                 if gold > 0 {
-                    gold as usize * island_info.production.gold
+                    gold as usize * system_info.production.gold
                 } else {
                     0
                 }
             };
             let stone_time = {
-                let stone = cost.stone as isize - island_info.stone as isize;
+                let stone = cost.stone as isize - system_info.stone as isize;
                 if stone > 0 {
-                    stone as usize * island_info.production.stone
+                    stone as usize * system_info.production.stone
                 } else {
                     0
                 }
             };
             let lumber_time = {
-                let lumber = cost.lumber as isize - island_info.lumber as isize;
+                let lumber = cost.lumber as isize - system_info.lumber as isize;
                 if lumber > 0 {
-                    lumber as usize * island_info.production.lumber
+                    lumber as usize * system_info.production.lumber
                 } else {
                     0
                 }
@@ -231,14 +234,14 @@ async fn fortress_get(
     Ok(Html::from(page.to_string()))
 }
 
-/// Answer a GET request to the building endpoint
+/// Answer a GET request to the structure endpoint
 ///
 /// TODO: This should respond with an actual HTML page
-async fn building_get(
-    Path((world, x, y, building)): Path<(String, usize, usize, String)>,
+async fn structure_get(
+    Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    println!("BuildingGet: World: {}, x: {}, y: {}", world, x, y);
-    let dets = building_info(&world, (x, y), &building);
+    println!("StructureGet: Galaxy: {}, x: {}, y: {}", galaxy, x, y);
+    let dets = structure_info(&galaxy, (x, y), &structure);
     if let Ok(dets) = dets {
         Ok(format!("{:?}", dets))
     } else {
@@ -246,13 +249,13 @@ async fn building_get(
     }
 }
 
-/// Answer a POST request to the building endpoint
+/// Answer a POST request to the structure endpoint
 ///
 /// TODO: This should respond with JSON
-async fn building_post(
-    Path((world, x, y, building)): Path<(String, usize, usize, String)>,
+async fn structure_post(
+    Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    let dets = building_info(&world, (x, y), &building);
+    let dets = structure_info(&galaxy, (x, y), &structure);
     if let Ok(dets) = dets {
         Ok(format!("{:?}", dets))
     } else {
@@ -260,19 +263,23 @@ async fn building_post(
     }
 }
 
-/// Retrieve the details of a building on an island
-fn building_info(world: &str, (x, y): (usize, usize), building: &str) -> Result<Details, String> {
-    println!("BuildingPost: World: {}, x: {}, y: {}", world, x, y);
-    let mut worlds = WORLDS.lock().unwrap();
-    if let Some(world) = worlds.get_mut(world) {
-        let building_type = BuildingType::from_str(building);
-        if let Ok(building) = building_type {
-            world.get_details(tick(), (x, y), Some(building))
+/// Retrieve the details of a structure on an system
+fn structure_info(
+    galaxy: &str,
+    (x, y): (usize, usize),
+    structure: &str,
+) -> Result<Details, String> {
+    println!("StructurePost: Galaxy: {}, x: {}, y: {}", galaxy, x, y);
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if let Some(galaxy) = galaxies.get_mut(galaxy) {
+        let structure_type = StructureType::from_str(structure);
+        if let Ok(structure) = structure_type {
+            galaxy.get_details(tick(), (x, y), Some(structure))
         } else {
-            Err("Building not found".to_string())
+            Err("Structure not found".to_string())
         }
     } else {
-        Err("World not found".to_string())
+        Err("Galaxy not found".to_string())
     }
 }
 
@@ -282,74 +289,74 @@ fn resource_table(gold: usize, stone: usize, lumber: usize) -> String {
 gold, stone, lumber)
 }
 
-/// Handler for GET requests to /:world/:x/:y
-async fn island_get(
-    Path((world, x, y)): Path<(String, usize, usize)>,
+/// Handler for GET requests to /:galaxy/:x/:y
+async fn system_get(
+    Path((galaxy, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
-    let island_info = island_info(&world, (x, y))?;
+    let system_info = system_info(&galaxy, (x, y))?;
 
     let mut page = format!("{}<br>
-<table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Buildings</b><br><font color=#CCCCC><b>",
-resource_table(island_info.gold, island_info.stone, island_info.lumber));
+<table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>",
+resource_table(system_info.gold, system_info.stone, system_info.lumber));
 
-    for (building, level) in island_info.buildings.iter() {
+    for (structure, level) in system_info.structures.iter() {
         page.push_str(&format!(
             "🛖 <a href=/{}/{}/{}/{}>{} (level {})</a><br>",
-            world,
+            galaxy,
             x,
             y,
-            building.to_string().to_lowercase(),
-            building,
+            structure.to_string().to_lowercase(),
+            structure,
             level
         ));
     }
 
     page.push_str(&format!(
         "<td vAlign=top><b>Score</b><br>{}</td></tr>",
-        island_info.score
+        system_info.score
     ));
     Ok(Html::from(page.to_string()))
 }
 
-/// Handler for POST requests to /:world/:x/:y
+/// Handler for POST requests to /:galaxy/:x/:y
 ///
 /// TODO: This should respond with JSON
-async fn island_post(Path((world, x, y)): Path<(String, usize, usize)>) -> Result<String, String> {
-    let mut worlds = WORLDS.lock().unwrap();
-    if let Some(world) = worlds.get_mut(&world) {
-        if let Ok(dets) = world.get_details(tick(), (x, y), None) {
+async fn system_post(Path((galaxy, x, y)): Path<(String, usize, usize)>) -> Result<String, String> {
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if let Some(galaxy) = galaxies.get_mut(&galaxy) {
+        if let Ok(dets) = galaxy.get_details(tick(), (x, y), None) {
             Ok(format!("{:?}", dets))
         } else {
-            Err("Island not found".to_string())
+            Err("System not found".to_string())
         }
     } else {
-        Err("World not found".to_string())
+        Err("Galaxy not found".to_string())
     }
 }
 
-/// Retrieve the details of an island
-fn island_info(world: &str, (x, y): (usize, usize)) -> Result<IslandInfo, String> {
-    let mut worlds = WORLDS.lock().unwrap();
-    if let Some(world) = worlds.get_mut(world) {
-        let dets = world.get_details(tick(), (x, y), None);
+/// Retrieve the details of an system
+fn system_info(galaxy: &str, (x, y): (usize, usize)) -> Result<SystemInfo, String> {
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if let Some(galaxy) = galaxies.get_mut(galaxy) {
+        let dets = galaxy.get_details(tick(), (x, y), None);
         if let Ok(dets) = dets {
             match dets {
-                Details::Island(info) => Ok(info),
+                Details::System(info) => Ok(info),
                 _ => Err("Unexpected Details type".to_string()),
             }
         } else {
             Err(dets.unwrap_err())
         }
     } else {
-        Err("World not found".to_string())
+        Err("Galaxy not found".to_string())
     }
 }
 
-/// Handler for GET requests to /:world/:x/:y/:building/build
-async fn build_building_get(
-    Path((world, x, y, building)): Path<(String, usize, usize, String)>,
+/// Handler for GET requests to /:galaxy/:x/:y/:structure/build
+async fn build_structure_get(
+    Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    let event = build_building(&world, (x, y), &building);
+    let event = build_structure(&galaxy, (x, y), &structure);
     if let Ok(event) = event {
         Ok(format!("{:?}", event))
     } else {
@@ -357,13 +364,13 @@ async fn build_building_get(
     }
 }
 
-/// Handler for POST requests to /:world/:x/:y/:building/build
+/// Handler for POST requests to /:galaxy/:x/:y/:structure/build
 ///
 /// TODO: This should respond with JSON
-async fn build_building_post(
-    Path((world, x, y, building)): Path<(String, usize, usize, String)>,
+async fn build_structure_post(
+    Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    let event = build_building(&world, (x, y), &building);
+    let event = build_structure(&galaxy, (x, y), &structure);
     if let Ok(event) = event {
         Ok(format!("{:?}", event))
     } else {
@@ -371,23 +378,23 @@ async fn build_building_post(
     }
 }
 
-/// Send the building request and return the internal type
-fn build_building(world: &str, (x, y): (usize, usize), building: &str) -> Result<Event, String> {
-    let mut worlds = WORLDS.lock().unwrap();
-    if let Some(world) = worlds.get_mut(world) {
-        let building_type = BuildingType::from_str(building);
-        if let Ok(building) = building_type {
-            world.build(tick(), (x, y), building)
+/// Send the structure request and return the internal type
+fn build_structure(galaxy: &str, (x, y): (usize, usize), structure: &str) -> Result<Event, String> {
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if let Some(galaxy) = galaxies.get_mut(galaxy) {
+        let structure_type = StructureType::from_str(structure);
+        if let Ok(structure) = structure_type {
+            galaxy.build(tick(), (x, y), structure)
         } else {
-            Err("Building not found".to_string())
+            Err("Structure not found".to_string())
         }
     } else {
-        Err("World not found".to_string())
+        Err("Galaxy not found".to_string())
     }
 }
 
-/// Handler for GET requests to /:world/stats
-async fn world_stats_get(Path(world): Path<String>) -> Result<Html<String>, String> {
+/// Handler for GET requests to /:galaxy/stats
+async fn galaxy_stats_get(Path(galaxy): Path<String>) -> Result<Html<String>, String> {
     let mut page = "
     <table width=600 border=0 cellspacing=1 cellpadding=3>
     <tr><td align=center><b>
@@ -395,9 +402,9 @@ async fn world_stats_get(Path(world): Path<String>) -> Result<Html<String>, Stri
     <tr><td bgcolor=dddddd><b>Isle</b></td><td bgcolor=dddddd width=15%><b>💰Gold</b></td>
     <td bgcolor=dddddd width=15%><b>🪨Stones</b></td><td bgcolor=dddddd width=15%><b>🪵Lumber</b></td><td bgcolor=dddddd width=15%><b>Activity</b></td><td width=2%></td></tr>
 ".to_string();
-    for (addr, dets) in world_info(&world).unwrap() {
+    for (addr, dets) in galaxy_info(&galaxy).unwrap() {
         match dets {
-            Details::Island(info) => {
+            Details::System(info) => {
                 // Build an activity string
                 // Scan through the activities to check if we're building something, and if so add a hover with the details
                 let mut activity = String::new();
@@ -408,15 +415,15 @@ async fn world_stats_get(Path(world): Path<String>) -> Result<Html<String>, Stri
                         let eta = event.completion - tick();
 
                         activity_hover.push_str(&format!(
-                            "Building {}: {} remaining",
-                            event.building.unwrap(),
+                            "Structure {}: {} remaining",
+                            event.structure.unwrap(),
                             seconds_to_readable(eta)
                         ));
                     }
                 }
                 page.push_str(&format!(
                 "<tr><td bgcolor=#ffffff><a href=/{}/{}/{}>{} ({}:{})</a></td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff title=\"{}\">{}</td></tr>",
-                world, addr.x, addr.y, "Island", addr.x, addr.y, info.gold, info.stone, info.lumber, activity_hover, activity
+                galaxy, addr.x, addr.y, "System", addr.x, addr.y, info.gold, info.stone, info.lumber, activity_hover, activity
             ));
             }
             _ => {
@@ -427,53 +434,53 @@ async fn world_stats_get(Path(world): Path<String>) -> Result<Html<String>, Stri
     Ok(Html::from(page.to_string()))
 }
 
-/// Handler for POST requests to /:world/stats
+/// Handler for POST requests to /:galaxy/stats
 ///
 /// TODO: This should respond with JSON
-async fn world_stats_post(Path(world): Path<String>) -> Result<String, String> {
-    println!("world_stats_post: {}", world);
-    world_stats(&world)
+async fn galaxy_stats_post(Path(galaxy): Path<String>) -> Result<String, String> {
+    println!("galaxy_stats_post: {}", galaxy);
+    galaxy_stats(&galaxy)
 }
 
-fn world_stats(world: &str) -> Result<String, String> {
-    let mut worlds = WORLDS.lock().unwrap();
-    if let Some(world) = worlds.get_mut(world) {
-        Ok(world.stats(tick()).unwrap())
+fn galaxy_stats(galaxy: &str) -> Result<String, String> {
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if let Some(galaxy) = galaxies.get_mut(galaxy) {
+        Ok(galaxy.stats(tick()).unwrap())
     } else {
-        Err("World not found".to_string())
+        Err("Galaxy not found".to_string())
     }
 }
 
-/// Handler for GET requests to /:world
+/// Handler for GET requests to /:galaxy
 ///
-/// Serves the World Dashboard page
-async fn world_get(Path(world): Path<String>) -> Result<Html<String>, String> {
-    world_stats_get(Path(world)).await
+/// Serves the Galaxy Dashboard page
+async fn galaxy_get(Path(galaxy): Path<String>) -> Result<Html<String>, String> {
+    galaxy_stats_get(Path(galaxy)).await
 }
 
-/// Handler for POST requests to /:world
-async fn world_post(Path(world): Path<String>) -> String {
-    format!("Welcome to world {}!", world).to_string()
+/// Handler for POST requests to /:galaxy
+async fn galaxy_post(Path(galaxy): Path<String>) -> String {
+    format!("Welcome to Galaxy {}!", galaxy).to_string()
 }
 
-/// Returns all the visible info for the world
-fn world_info(world: &str) -> Result<Vec<(Coords, Details)>, String> {
-    let mut island_info = Vec::new();
-    let mut worlds = WORLDS.lock().unwrap();
-    if let Some(world) = worlds.get_mut(world) {
-        let addresses = world.islands().keys().cloned().collect::<Vec<_>>();
+/// Returns all the visible info for the galaxy
+fn galaxy_info(galaxy: &str) -> Result<Vec<(Coords, Details)>, String> {
+    let mut system_info = Vec::new();
+    let mut galaxies = GALAXIES.lock().unwrap();
+    if let Some(galaxy) = galaxies.get_mut(galaxy) {
+        let addresses = galaxy.systems().keys().cloned().collect::<Vec<_>>();
         for addr in addresses {
-            island_info.push((
+            system_info.push((
                 Coords {
                     x: addr.0,
                     y: addr.1,
                 },
-                world.get_details(tick(), addr, None).unwrap(),
+                galaxy.get_details(tick(), addr, None).unwrap(),
             ));
         }
-        Ok(island_info)
+        Ok(system_info)
     } else {
-        Err("World not found".to_string())
+        Err("Galaxy not found".to_string())
     }
 }
 

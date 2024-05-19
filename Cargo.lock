@@ -183,6 +183,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "galactic-war"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "lazy_static",
+ "rand",
+ "serde",
+ "serde_yaml",
+ "tokio",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -300,18 +312,6 @@ checksum = "168fb715dda47215e360912c096649d23d58bf392ac62f73919e831745e40f26"
 dependencies = [
  "equivalent",
  "hashbrown",
-]
-
-[[package]]
-name = "islandfight"
-version = "0.1.0"
-dependencies = [
- "axum",
- "lazy_static",
- "rand",
- "serde",
- "serde_yaml",
- "tokio",
 ]
 
 [[package]]

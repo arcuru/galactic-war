@@ -1,5 +1,5 @@
 {
-  description = "islandfight";
+  description = "galactic-war";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -79,15 +79,15 @@
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
       # Build the actual crate itself, reusing the cargoArtifacts
-      islandfight = craneLib.buildPackage commonArgs;
+      galactic-war = craneLib.buildPackage commonArgs;
     in {
       checks =
         {
           # Build the final package as part of `nix flake check` for convenience
-          inherit (self.packages.${system}) islandfight;
+          inherit (self.packages.${system}) galactic-war;
 
           # Run clippy (and deny all warnings) on the crate source
-          islandfight-clippy =
+          galactic-war-clippy =
             craneLib.cargoClippy
             (commonArgs
               // {
@@ -95,14 +95,14 @@
               });
 
           # Check docs build successfully
-          islandfight-doc = craneLib.cargoDoc commonArgs;
+          galactic-war-doc = craneLib.cargoDoc commonArgs;
 
           # Check formatting
-          islandfight-fmt = craneLib.cargoFmt commonArgs;
+          galactic-war-fmt = craneLib.cargoFmt commonArgs;
 
           # Run tests with cargo-nextest
           # Note: This provides limited value, as tests are already run in the build
-          islandfight-nextest = craneLib.cargoNextest commonArgs;
+          galactic-war-nextest = craneLib.cargoNextest commonArgs;
 
           # Audit dependencies
           crate-audit = craneLib.cargoAudit (commonArgs
@@ -112,7 +112,7 @@
         }
         // lib.optionalAttrs (system == "x86_64-linux") {
           # Check code coverage with tarpaulin runs
-          islandfight-tarpaulin = craneLib.cargoTarpaulin commonArgs;
+          galactic-war-tarpaulin = craneLib.cargoTarpaulin commonArgs;
         }
         // {
           # Run formatting checks before commit
@@ -129,19 +129,19 @@
         };
 
       packages = rec {
-        inherit islandfight;
-        default = islandfight;
+        inherit galactic-war;
+        default = galactic-war;
       };
 
       apps = rec {
-        default = islandfight;
-        islandfight = inputs.flake-utils.lib.mkApp {
-          drv = self.packages.${system}.islandfight;
+        default = galactic-war;
+        galactic-war = inputs.flake-utils.lib.mkApp {
+          drv = self.packages.${system}.galactic-war;
         };
       };
 
       devShells.default = pkgs.mkShell {
-        name = "islandfight";
+        name = "galactic-war";
         shellHook = ''
           ${self.checks.${system}.pre-commit-check.shellHook}
           echo ---------------------
@@ -174,7 +174,7 @@
     })
     // {
       overlays.default = final: prev: {
-        islandfight = self.packages.${final.system}.islandfight;
+        galactic-war = self.packages.${final.system}.galactic-war;
       };
     };
 }

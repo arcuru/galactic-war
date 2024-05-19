@@ -1,8 +1,8 @@
 [package]
-name = "islandfight"
+name = "galactic-war"
 version = "0.1.0"
 edition = "2021"
-description = "A casual game based on the classic Inselkampf"
+description = "A casual game of Galactic War"
 
 [dependencies]
 rand = "0.8"
@@ -17,6 +17,6 @@ default = []
 cli = ["axum", "serde_yaml", "tokio", "lazy_static"]
 
 [[bin]]
-name = "islandfight"
+name = "galactic-war"
 path = "src/main.rs"
 required-features = ["cli"]

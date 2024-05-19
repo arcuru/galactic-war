@@ -1,11 +1,11 @@
-island_count: 2
+system_count: 2
 size:
   x: 100
   y: 100
-islands:
+systems:
   resources:
     gold: 0
-  buildings:
+  structures:
     goldpit:
       starting_level: 0
       # These are the number of ticks it takes to produce 1 gold at a given level

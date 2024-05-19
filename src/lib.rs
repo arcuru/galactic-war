@@ -1,21 +1,21 @@
-use island::EventInfo;
 use rand::Rng;
 use std::collections::HashMap;
+use system::EventInfo;
 
 pub mod config;
-mod island;
-use crate::config::WorldConfig;
-use crate::island::Island;
+mod system;
+use crate::config::GalaxyConfig;
+use crate::system::System;
 
-pub use crate::island::{BuildingType, Event, EventCallback};
+pub use crate::system::{Event, EventCallback, StructureType};
 
 #[derive(Debug)]
-pub struct World {
-    /// Cached configuration for the world
-    config: WorldConfig,
+pub struct Galaxy {
+    /// Cached configuration for the galaxy
+    config: GalaxyConfig,
 
-    /// All the islands in the world
-    islands: HashMap<(usize, usize), Island>,
+    /// All the systems in the galaxy
+    systems: HashMap<(usize, usize), System>,
 
     /// The most recent tick
     ///
@@ -23,25 +23,25 @@ pub struct World {
     tick: usize,
 }
 
-/// Production of an island
+/// Production of a system
 ///
 /// Each value is the number of ticks needed to produce each resource
 #[derive(Debug, Default)]
-pub struct IslandProduction {
+pub struct SystemProduction {
     pub gold: usize,
     pub lumber: usize,
     pub stone: usize,
 }
 
 #[derive(Debug, Default)]
-pub struct IslandInfo {
+pub struct SystemInfo {
     pub score: usize,
     pub gold: usize,
     pub lumber: usize,
     pub stone: usize,
-    pub production: IslandProduction,
-    /// Building levels
-    pub buildings: HashMap<BuildingType, usize>,
+    pub production: SystemProduction,
+    /// Structure levels
+    pub structures: HashMap<StructureType, usize>,
 
     /// Events in flight
     ///
@@ -58,90 +58,90 @@ pub struct Cost {
     pub ticks: usize,
 }
 
-/// Info for a specific Building
+/// Info for a specific structure
 ///
-/// Lots of details are optional, as they don't all apply to all buildings
+/// Lots of details are optional, as they don't all apply to all structures
 #[derive(Debug, Default)]
-pub struct BuildingInfo {
+pub struct StructureInfo {
     pub level: usize,
-    pub production: Option<IslandProduction>,
-    pub builds: Option<HashMap<BuildingType, Cost>>,
+    pub production: Option<SystemProduction>,
+    pub builds: Option<HashMap<StructureType, Cost>>,
 }
 
 /// Info to use in return values
 ///
-/// Stores IslandInfo, and will store details about buildings in the future
+/// Stores SystemInfo and StructureInfo
 /// TODO: Is this really the best approach? If it's just two types, may want to just split the API.
 #[derive(Debug)]
 pub enum Details {
-    Island(IslandInfo),
-    Building(BuildingInfo),
+    System(SystemInfo),
+    Structure(StructureInfo),
 }
 
-impl World {
-    /// Create a new World
+impl Galaxy {
+    /// Create a new Galaxy
     ///
     /// Uses a custom configuration struct to set up all the details
-    pub fn new(config: WorldConfig, initial_tick: usize) -> Self {
-        let mut islands = HashMap::new();
-        for _ in 0..config.island_count {
+    pub fn new(config: GalaxyConfig, initial_tick: usize) -> Self {
+        let mut systems = HashMap::new();
+        for _ in 0..config.system_count {
             // Create a new island at a random location in the 2d space
 
             let mut rng = rand::thread_rng();
             let x: usize = rng.gen_range(0..=config.size.x);
             let y: usize = rng.gen_range(0..=config.size.y);
-            let island = Island::new(initial_tick, &config.islands, &config);
-            islands.insert((x, y), island);
+            let system = System::new(initial_tick, &config.systems, &config);
+            systems.insert((x, y), system);
         }
         Self {
             config,
-            islands,
+            systems,
             tick: initial_tick,
         }
     }
 
-    /// Retrieve the details of an island, possibly scoped to a specific building
+    /// Retrieve the details of an island, possibly scoped to a specific structure
     pub fn get_details(
         &mut self,
         tick: usize,
         (x, y): (usize, usize),
-        building: Option<BuildingType>,
+        structure: Option<StructureType>,
     ) -> Result<Details, String> {
         self.update_tick(tick)?;
-        let island = self.islands.get_mut(&(x, y)).unwrap();
-        island.get_details(tick, &self.config, building)
+        let island = self.systems.get_mut(&(x, y)).unwrap();
+        island.get_details(tick, &self.config, structure)
     }
 
-    /// Return basic stats about the World
+    /// Return basic stats about the Galaxy
     pub fn stats(&mut self, tick: usize) -> Result<String, String> {
         self.update_tick(tick)?;
-        let mut stats = format!("Island count: {}\n", self.config.island_count);
-        for (coords, island) in self.islands.iter_mut() {
+        let mut stats = format!("System count: {}\n", self.config.system_count);
+        for (coords, system) in self.systems.iter_mut() {
             stats.push_str(&format!(
-                "Island at {:?} has score {} and gold {}\n",
+                "System at {:?} has score {} and gold {}\n",
                 coords,
-                island.score(tick, &self.config),
-                island.gold(tick, &self.config),
+                system.score(tick, &self.config),
+                system.gold(tick, &self.config),
             ));
         }
         Ok(stats)
     }
 
-    /// Retrieve the full list of islands
-    pub fn islands(&self) -> &HashMap<(usize, usize), Island> {
-        &self.islands
+    /// Retrieve the full list of systems
+    pub fn systems(&self) -> &HashMap<(usize, usize), System> {
+        &self.systems
     }
 
-    /// Build a building on an island
+    /// Build a structure in a system
     pub fn build(
         &mut self,
         tick: usize,
         (x, y): (usize, usize),
-        building: BuildingType,
+        structure: StructureType,
     ) -> Result<Event, String> {
         self.update_tick(tick)?;
-        let island = self.islands.get_mut(&(x, y)).unwrap();
-        island.build(tick, &self.config, building)
+        let system = self.systems.get_mut(&(x, y)).unwrap();
+        system.build(tick, &self.config, structure)
     }
 
     /// Update the current tick, and verify we are not going back in time

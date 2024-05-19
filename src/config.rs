@@ -1,41 +1,41 @@
 /// Contains all the config structs
 ///
-/// This is everything used externally to configure the world
+/// This is everything used externally to configure the galaxy
 use serde::Deserialize;
 use std::collections::HashMap;
 
-/// Configuration for the world
+/// Configuration for the Galaxy
 #[derive(Debug, Deserialize, Default)]
-pub struct WorldConfig {
-    /// Static Island Count
-    pub island_count: usize,
+pub struct GalaxyConfig {
+    /// Static System Count
+    pub system_count: usize,
 
-    /// World size
-    pub size: WorldSize,
+    /// Galaxy size
+    pub size: GalaxySize,
 
-    /// Island Config
-    pub islands: IslandConfig,
+    /// System Config
+    pub systems: SystemConfig,
 }
 
 #[derive(Debug, Deserialize, Default)]
-pub struct WorldSize {
+pub struct GalaxySize {
     pub x: usize,
     pub y: usize,
 }
 
-/// Configuration for the creation of an island
+/// Configuration for the creation of an system
 #[derive(Debug, Default, Deserialize)]
-pub struct IslandConfig {
-    /// List of buildings that will be built on the island
-    pub buildings: HashMap<String, BuildingConfig>,
+pub struct SystemConfig {
+    /// List of structures that will be built on the system
+    pub structures: HashMap<String, StructureConfig>,
 
-    /// Starting resources for the island
+    /// Starting resources for the system
     pub resources: HashMap<String, usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
-pub struct BuildingConfig {
-    /// Starting level for this type of building
+pub struct StructureConfig {
+    /// Starting level for this type of structure
     /// If not provided it is 0
     pub starting_level: Option<usize>,
 
