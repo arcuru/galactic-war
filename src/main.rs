@@ -42,7 +42,7 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         .route("/:galaxy/create", get(galaxy_create_get))
         .route("/:galaxy/:x/:y", get(system_get))
         .route("/:galaxy/:x/:y/", get(system_get))
-        .route("/:galaxy/:x/:y/fortress", get(fortress_get))
+        .route("/:galaxy/:x/:y/colony", get(colony_get))
         .route("/:galaxy/:x/:y/:structure", get(structure_get))
         .route("/:galaxy/:x/:y/:structure/build", get(build_structure_get))
         .route("/", get(base_get));
@@ -116,14 +116,14 @@ async fn galaxy_create_get(Path(galaxy): Path<String>) -> String {
     format!("Galaxy {} created", galaxy)
 }
 
-/// Handler for GET requests to /:galaxy/:x/:y/fortress
-async fn fortress_get(
+/// Handler for GET requests to /:galaxy/:x/:y/colony
+async fn colony_get(
     Path((galaxy, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
-    let dets = structure_info(&galaxy, (x, y).into(), "Fortress");
+    let dets = structure_info(&galaxy, (x, y).into(), "Colony");
 
     let system_info = system_info(&galaxy, (x, y).into()).unwrap();
-    let mut page = resource_table(system_info.gold, system_info.stone, system_info.lumber);
+    let mut page = resource_table(system_info.metal, system_info.crew, system_info.water);
 
     // Push the table header
     page.push_str("<p><table width=600 border=0 cellspacing=1 cellpadding=3>");
@@ -150,50 +150,50 @@ async fn fortress_get(
 
         page.push_str(&format!(
             "<br>Cost: 💰{}/🪨{}/🪵{}   Duration: {}</td>",
-            cost.gold,
-            cost.stone,
-            cost.lumber,
+            cost.metal,
+            cost.crew,
+            cost.water,
             seconds_to_readable(cost.ticks)
         ));
 
-        if system_info.gold >= cost.gold
-            && system_info.stone >= cost.stone
-            && system_info.lumber >= cost.lumber
+        if system_info.metal >= cost.metal
+            && system_info.crew >= cost.crew
+            && system_info.water >= cost.water
         {
             page.push_str(&format!(
                 "<td bgcolor=dddddd width=200><a href=/{}/{}/{}/{}/build>Upgrade to level {}</a></td></tr>",
                 galaxy, x, y, structure.to_string().to_lowercase(), level + 1));
         } else {
             // Figure out how long it will take to produce the missing resources at the current rate
-            let gold_time = {
-                let gold = cost.gold as isize - system_info.gold as isize;
-                if gold > 0 {
-                    gold as usize * system_info.production.gold
+            let metal_time = {
+                let metal = cost.metal as isize - system_info.metal as isize;
+                if metal > 0 {
+                    metal as usize * system_info.production.metal
                 } else {
                     0
                 }
             };
-            let stone_time = {
-                let stone = cost.stone as isize - system_info.stone as isize;
-                if stone > 0 {
-                    stone as usize * system_info.production.stone
+            let crew_time = {
+                let crew = cost.crew as isize - system_info.crew as isize;
+                if crew > 0 {
+                    crew as usize * system_info.production.water
                 } else {
                     0
                 }
             };
-            let lumber_time = {
-                let lumber = cost.lumber as isize - system_info.lumber as isize;
-                if lumber > 0 {
-                    lumber as usize * system_info.production.lumber
+            let water_time = {
+                let water = cost.water as isize - system_info.water as isize;
+                if water > 0 {
+                    water as usize * system_info.production.crew
                 } else {
                     0
                 }
             };
             // Find the longest time to produce the missing resources, and the name of the typpe
-            let time = max(gold_time, max(stone_time, lumber_time));
-            let resource = if time == gold_time {
+            let time = max(metal_time, max(crew_time, water_time));
+            let resource = if time == metal_time {
                 "💰"
-            } else if time == stone_time {
+            } else if time == crew_time {
                 "🪨"
             } else {
                 "🪵"
@@ -239,9 +239,9 @@ fn structure_info(galaxy: &str, coords: Coords, structure: &str) -> Result<Detai
 }
 
 /// Return a standardized HTML table for displaying resources
-fn resource_table(gold: usize, stone: usize, lumber: usize) -> String {
+fn resource_table(metal: usize, crew: usize, water: usize) -> String {
     format!("<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td width=33%>💰 {}</td><td width=33%>🪨 {}</td><td>🪵 {}</td></tr></table>",
-gold, stone, lumber)
+metal, crew, water)
 }
 
 /// Handler for GET requests to /:galaxy/:x/:y
@@ -252,7 +252,7 @@ async fn system_get(
 
     let mut page = format!("{}<br>
 <table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>",
-resource_table(system_info.gold, system_info.stone, system_info.lumber));
+resource_table(system_info.metal, system_info.crew, system_info.water));
 
     for (structure, level) in system_info.structures.iter() {
         page.push_str(&format!(
@@ -324,8 +324,8 @@ async fn galaxy_stats_get(Path(galaxy): Path<String>) -> Result<Html<String>, St
     <table width=600 border=0 cellspacing=1 cellpadding=3>
     <tr><td align=center><b>
     <table width=600 border=0 cellspacing=1 cellpadding=3>
-    <tr><td bgcolor=dddddd><b>Isle</b></td><td bgcolor=dddddd width=15%><b>💰Gold</b></td>
-    <td bgcolor=dddddd width=15%><b>🪨Stones</b></td><td bgcolor=dddddd width=15%><b>🪵Lumber</b></td><td bgcolor=dddddd width=15%><b>Activity</b></td><td width=2%></td></tr>
+    <tr><td bgcolor=dddddd><b>Isle</b></td><td bgcolor=dddddd width=15%><b>💰metal</b></td>
+    <td bgcolor=dddddd width=15%><b>🪨crews</b></td><td bgcolor=dddddd width=15%><b>🪵water</b></td><td bgcolor=dddddd width=15%><b>Activity</b></td><td width=2%></td></tr>
 ".to_string();
     for (addr, dets) in galaxy_info(&galaxy).unwrap() {
         match dets {
@@ -348,7 +348,7 @@ async fn galaxy_stats_get(Path(galaxy): Path<String>) -> Result<Html<String>, St
                 }
                 page.push_str(&format!(
                 "<tr><td bgcolor=#ffffff><a href=/{}/{}/{}>{} ({}:{})</a></td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff title=\"{}\">{}</td></tr>",
-                galaxy, addr.x, addr.y, "System", addr.x, addr.y, info.gold, info.stone, info.lumber, activity_hover, activity
+                galaxy, addr.x, addr.y, "System", addr.x, addr.y, info.metal, info.crew, info.water, activity_hover, activity
             ));
             }
             _ => {

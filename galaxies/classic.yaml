@@ -1,59 +1,70 @@
-system_count: 2
+# Settings for a classic game of Galactic War
+#
+# The configuration is intended to be used as a base for a long-term game spanning multiple months of real-time play.
+
+system_count: 200
 size:
   x: 100
   y: 100
 systems:
   resources:
-    gold: 0
+    crew: 1
+    metal: 1
+    water: 1
   structures:
-    goldpit:
-      starting_level: 0
-      # These are the number of ticks it takes to produce 1 gold at a given level
-      production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-      cost:
-        - gold: 10
-          stone: 1
-          lumber: 3
-          time: 100
-        - gold: 20
-          stone: 0
-          time: 1
-        - gold: 30
-        - gold: 40
-          time: 1
-    sawmill:
-      production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-      cost:
-        - gold: 10
-          stone: 0
-          time: 100
-        - gold: 20
-          stone: 0
-          time: 1
-        - gold: 30
-        - gold: 40
-          time: 1
-    stonebasin:
-      production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-      cost:
-        - gold: 1
-          stone: 1
-          time: 100
-        - gold: 20
-          stone: 0
-          time: 1
-        - gold: 30
-        - gold: 40
-          time: 1
-    fortress:
+    colony:
+      description: "The colony is the heart of your empire. It is where you can build and upgrade structures. Upgrading your colony will allow you to build more structures."
       starting_level: 1
+      #production_multiplier: 1.2 # Explicitly smaller than the production multipliers for the other structures
+      production:
+        - resource: crew
+          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        - resource: metal
+          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        - resource: water
+          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+      cost_multiplier: 1.25
       cost:
-        - gold: 10
-          stone: 0
+        - crew: 5
+          metal: 5
+          water: 5
           time: 100
-        - gold: 20
-          stone: 0
-          time: 1
-        - gold: 30
-        - gold: 40
-          time: 1
+        # Cost for lvl 2
+        - crew: 5
+          metal: 5
+          water: 5
+          time: 100
+    hatchery:
+      description: "The hatchery is where you can produce crew members. The more crew members you have, the more you can do."
+      starting_level: 0
+      cost_multiplier: 1.25
+      # Time to produce 1 crew member at a given level
+      production:
+        - resource: crew
+          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+      cost:
+        - time: 100
+        - crew: 5
+          time: 125
+    asteroidmine:
+      description: "Mine the astroid fields for precious and not so precious metals."
+      starting_level: 0
+      production:
+        - resource: metal
+          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+      cost_multiplier: 1.25
+      cost:
+        - metal: 10
+          water: 10
+          crew: 10
+          time: 100
+    waterharvester:
+      description: "Operate water harvesters to collect water from comets and frozen worlds."
+      production:
+        - resource: water
+          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+      cost:
+        - metal: 10
+          water: 10
+          crew: 10
+          time: 100

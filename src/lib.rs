@@ -28,17 +28,17 @@ pub struct Galaxy {
 /// Each value is the number of ticks needed to produce each resource
 #[derive(Debug, Default)]
 pub struct SystemProduction {
-    pub gold: usize,
-    pub lumber: usize,
-    pub stone: usize,
+    pub metal: usize,
+    pub crew: usize,
+    pub water: usize,
 }
 
 #[derive(Debug, Default)]
 pub struct SystemInfo {
     pub score: usize,
-    pub gold: usize,
-    pub lumber: usize,
-    pub stone: usize,
+    pub metal: usize,
+    pub water: usize,
+    pub crew: usize,
     pub production: SystemProduction,
 
     /// Structure levels
@@ -53,9 +53,9 @@ pub struct SystemInfo {
 /// Struct to hold the cost for a build
 #[derive(Debug, Default)]
 pub struct Cost {
-    pub gold: usize,
-    pub lumber: usize,
-    pub stone: usize,
+    pub metal: usize,
+    pub water: usize,
+    pub crew: usize,
     pub ticks: usize,
 }
 
@@ -122,10 +122,10 @@ impl Galaxy {
         let mut stats = format!("System count: {}\n", self.config.system_count);
         for (coords, system) in self.systems.iter_mut() {
             stats.push_str(&format!(
-                "System at {:?} has score {} and gold {}\n",
+                "System at {:?} has score {} and metal {}\n",
                 coords,
                 system.score(tick, &self.config),
-                system.gold(tick, &self.config),
+                system.metal(tick, &self.config),
             ));
         }
         Ok(stats)

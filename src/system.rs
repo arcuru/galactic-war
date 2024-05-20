@@ -11,9 +11,9 @@ use std::str::FromStr;
 pub struct System {
     /// List of events that are happening in the system
     events: Vec<Event>,
-    gold: usize,
-    lumber: usize,
-    stone: usize,
+    metal: usize,
+    water: usize,
+    crew: usize,
     structures: Vec<Structure>,
 }
 
@@ -34,22 +34,18 @@ pub type EventInfo = Event;
 
 #[derive(Clone, Debug)]
 pub enum EventCallback {
-    Gold,
-    Lumber,
-    Stone,
+    Metal,
+    Water,
+    Crew,
     Build,
 }
 
 #[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StructureType {
-    Fortress,
-    GoldPit,
-    StoneBasin,
-    Sawmill,
-    Garrison,
-    Warehouse,
-    Barricade,
-    WatchTower,
+    Colony,
+    AsteroidMine,
+    WaterHarvester,
+    Hatchery,
 }
 
 impl fmt::Display for StructureType {
@@ -63,14 +59,10 @@ impl FromStr for StructureType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "fortress" => Ok(StructureType::Fortress),
-            "goldpit" => Ok(StructureType::GoldPit),
-            "stonebasin" => Ok(StructureType::StoneBasin),
-            "sawmill" => Ok(StructureType::Sawmill),
-            "garrison" => Ok(StructureType::Garrison),
-            "warehouse" => Ok(StructureType::Warehouse),
-            "barricade" => Ok(StructureType::Barricade),
-            "watchtower" => Ok(StructureType::WatchTower),
+            "colony" => Ok(StructureType::Colony),
+            "asteroidmine" => Ok(StructureType::AsteroidMine),
+            "waterharvester" => Ok(StructureType::WaterHarvester),
+            "hatchery" => Ok(StructureType::Hatchery),
             _ => Err(()),
         }
     }
@@ -81,9 +73,9 @@ impl System {
     ///
     /// This takes an SystemConfig because there may be multiple system types in future
     pub fn new(tick: usize, system_config: &SystemConfig, galaxy_config: &GalaxyConfig) -> Self {
-        let gold = *system_config.resources.get("gold").unwrap_or(&0);
-        let lumber = *system_config.resources.get("lumber").unwrap_or(&0);
-        let stone = *system_config.resources.get("stone").unwrap_or(&0);
+        let metal = *system_config.resources.get("metal").unwrap_or(&0);
+        let water = *system_config.resources.get("water").unwrap_or(&0);
+        let crew = *system_config.resources.get("crew").unwrap_or(&0);
         let mut structures = Vec::new();
         for (name, structure) in system_config.structures.iter() {
             structures.push(Structure {
@@ -95,33 +87,33 @@ impl System {
         let mut events = Vec::new();
         for structure in structures.iter() {
             match structure.name {
-                StructureType::GoldPit => {
+                StructureType::AsteroidMine => {
                     let config =
-                        System::get_structure_config(galaxy_config, StructureType::GoldPit);
-                    let time = config.production.as_ref().unwrap()[structure.level];
+                        System::get_structure_config(galaxy_config, StructureType::AsteroidMine);
+                    let metal = &config.production.as_ref().unwrap()[0]; // FIXME: allow different resources?
                     events.push(Event {
-                        completion: tick + time,
-                        action: EventCallback::Gold,
+                        completion: tick + metal.production[structure.level],
+                        action: EventCallback::Metal,
                         structure: None,
                     });
                 }
-                StructureType::Sawmill => {
+                StructureType::Hatchery => {
                     let config =
-                        System::get_structure_config(galaxy_config, StructureType::Sawmill);
-                    let time = config.production.as_ref().unwrap()[structure.level];
+                        System::get_structure_config(galaxy_config, StructureType::Hatchery);
+                    let crew = &config.production.as_ref().unwrap()[0]; // FIXME: allow different resources?
                     events.push(Event {
-                        completion: tick + time,
-                        action: EventCallback::Lumber,
+                        completion: tick + crew.production[structure.level],
+                        action: EventCallback::Water,
                         structure: None,
                     });
                 }
-                StructureType::StoneBasin => {
+                StructureType::WaterHarvester => {
                     let config =
-                        System::get_structure_config(galaxy_config, StructureType::StoneBasin);
-                    let time = config.production.as_ref().unwrap()[structure.level];
+                        System::get_structure_config(galaxy_config, StructureType::WaterHarvester);
+                    let water = &config.production.as_ref().unwrap()[0]; // FIXME: allow different resources?
                     events.push(Event {
-                        completion: tick + time,
-                        action: EventCallback::Stone,
+                        completion: tick + water.production[structure.level],
+                        action: EventCallback::Crew,
                         structure: None,
                     });
                 }
@@ -132,9 +124,9 @@ impl System {
 
         Self {
             events,
-            gold,
-            lumber,
-            stone,
+            metal,
+            water,
+            crew,
             structures,
         }
     }
@@ -176,20 +168,26 @@ impl System {
     ) -> SystemProduction {
         self.process_events(tick, galaxy_config);
         let mut production = SystemProduction {
-            gold: 0,
-            lumber: 0,
-            stone: 0,
+            metal: 0,
+            crew: 0,
+            water: 0,
         };
         match structure {
-            StructureType::GoldPit => {
-                let config = System::get_structure_config(galaxy_config, StructureType::GoldPit);
-                production.gold = config.production.as_ref().unwrap()
-                    [self.structure_level(StructureType::GoldPit)];
+            StructureType::AsteroidMine => {
+                let config =
+                    System::get_structure_config(galaxy_config, StructureType::AsteroidMine);
+                production.metal = config.production.as_ref().unwrap()[0].production
+                    [self.structure_level(StructureType::AsteroidMine)];
             }
-            StructureType::Sawmill => {
-                let config = System::get_structure_config(galaxy_config, StructureType::Sawmill);
-                production.lumber = config.production.as_ref().unwrap()
-                    [self.structure_level(StructureType::Sawmill)];
+            StructureType::Hatchery => {
+                let config = System::get_structure_config(galaxy_config, StructureType::Hatchery);
+                production.crew = config.production.as_ref().unwrap()[0].production
+                    [self.structure_level(StructureType::Hatchery)];
+            }
+            StructureType::WaterHarvester => {
+                let config = System::get_structure_config(galaxy_config, StructureType::Hatchery);
+                production.water = config.production.as_ref().unwrap()[0].production
+                    [self.structure_level(StructureType::WaterHarvester)];
             }
             _ => {}
         };
@@ -199,17 +197,24 @@ impl System {
     /// Get the production of the system
     fn get_production(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> SystemProduction {
         self.process_events(tick, galaxy_config);
-        // Get the gold production
-        let gold = {
-            let config = System::get_structure_config(galaxy_config, StructureType::GoldPit);
-            config.production.as_ref().unwrap()[self.structure_level(StructureType::GoldPit)]
+        // Get the metal production
+        let metal = {
+            let config = System::get_structure_config(galaxy_config, StructureType::AsteroidMine);
+            config.production.as_ref().unwrap()[0].production
+                [self.structure_level(StructureType::AsteroidMine)]
+        };
+        let crew = {
+            let config = System::get_structure_config(galaxy_config, StructureType::Hatchery);
+            config.production.as_ref().unwrap()[0].production
+                [self.structure_level(StructureType::Hatchery)]
+        };
+        let water = {
+            let config = System::get_structure_config(galaxy_config, StructureType::WaterHarvester);
+            config.production.as_ref().unwrap()[0].production
+                [self.structure_level(StructureType::WaterHarvester)]
         };
 
-        SystemProduction {
-            gold,
-            lumber: 0,
-            stone: 0,
-        }
+        SystemProduction { metal, crew, water }
     }
 
     /// Callback for events
@@ -222,42 +227,46 @@ impl System {
             return;
         }
         match event.action {
-            EventCallback::Gold => {
-                self.gold += 1;
-                // Create a new event for the next gold piece
-                let time = System::get_structure_config(galaxy_config, StructureType::GoldPit)
+            EventCallback::Metal => {
+                self.metal += 1;
+                // Create a new event for the next metal piece
+                let time = System::get_structure_config(galaxy_config, StructureType::AsteroidMine)
                     .production
                     .as_ref()
-                    .unwrap()[self.structure_level(StructureType::GoldPit)];
+                    .unwrap()[0]
+                    .production[self.structure_level(StructureType::AsteroidMine)];
                 self.register_event(Event {
                     completion: event.completion + time,
-                    action: EventCallback::Gold,
+                    action: EventCallback::Metal,
                     structure: None,
                 });
             }
-            EventCallback::Lumber => {
-                self.lumber += 1;
-                // Create a new event for the next lumber piece
-                let time = System::get_structure_config(galaxy_config, StructureType::Sawmill)
+            EventCallback::Water => {
+                self.water += 1;
+                // Create a new event for the next crew member
+                let time = System::get_structure_config(galaxy_config, StructureType::Hatchery)
                     .production
                     .as_ref()
-                    .unwrap()[self.structure_level(StructureType::Sawmill)];
+                    .unwrap()[0]
+                    .production[self.structure_level(StructureType::Hatchery)];
                 self.register_event(Event {
                     completion: event.completion + time,
-                    action: EventCallback::Lumber,
+                    action: EventCallback::Water,
                     structure: None,
                 });
             }
-            EventCallback::Stone => {
-                self.stone += 1;
-                // Create a new event for the next stone piece
-                let time = System::get_structure_config(galaxy_config, StructureType::StoneBasin)
-                    .production
-                    .as_ref()
-                    .unwrap()[self.structure_level(StructureType::StoneBasin)];
+            EventCallback::Crew => {
+                self.crew += 1;
+                // Create a new event for the next water unit
+                let time =
+                    System::get_structure_config(galaxy_config, StructureType::WaterHarvester)
+                        .production
+                        .as_ref()
+                        .unwrap()[0]
+                        .production[self.structure_level(StructureType::WaterHarvester)];
                 self.register_event(Event {
                     completion: event.completion + time,
-                    action: EventCallback::Stone,
+                    action: EventCallback::Crew,
                     structure: None,
                 });
             }
@@ -273,22 +282,22 @@ impl System {
         }
     }
 
-    /// Get the current gold amount
-    pub fn gold(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
+    /// Get the current metal amount
+    pub fn metal(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        self.gold
+        self.metal
     }
 
-    /// Get the current lumber amount
-    pub fn lumber(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
+    /// Get the current water amount
+    pub fn water(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        self.lumber
+        self.water
     }
 
-    /// Get the current stone amount
-    pub fn stone(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
+    /// Get the current crew count
+    pub fn crew(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        self.stone
+        self.crew
     }
 
     /// Check if there is an event that needs to be processed
@@ -345,14 +354,14 @@ impl System {
             // Verify if the structure can be built
             let cost = &System::get_structure_config(galaxy_config, structure).cost
                 [self.structure_level(structure)];
-            if self.gold >= *cost.get("gold").unwrap_or(&0)
-                && self.lumber >= *cost.get("lumber").unwrap_or(&0)
-                && self.stone >= *cost.get("stone").unwrap_or(&0)
+            if self.metal >= *cost.get("metal").unwrap_or(&0)
+                && self.water >= *cost.get("water").unwrap_or(&0)
+                && self.crew >= *cost.get("stone").unwrap_or(&0)
             {
                 // Deduct the cost
-                self.gold -= cost.get("gold").unwrap_or(&0);
-                self.lumber -= cost.get("lumber").unwrap_or(&0);
-                self.stone -= cost.get("stone").unwrap_or(&0);
+                self.metal -= cost.get("metal").unwrap_or(&0);
+                self.water -= cost.get("water").unwrap_or(&0);
+                self.crew -= cost.get("stone").unwrap_or(&0);
                 // Increase the level
                 let event = Event {
                     completion: tick + cost.get("time").unwrap_or(&1),
@@ -384,7 +393,7 @@ impl System {
                 production: Some(self.get_structure_production(tick, galaxy_config, structure)),
                 builds: None,
             };
-            if structure == StructureType::Fortress {
+            if structure == StructureType::Colony {
                 if details.builds.is_none() {
                     details.builds = Some(HashMap::new());
                 }
@@ -393,17 +402,17 @@ impl System {
                     builds.insert(
                         structure.name,
                         Cost {
-                            gold: *System::get_structure_config(galaxy_config, structure.name).cost
+                            metal: *System::get_structure_config(galaxy_config, structure.name)
+                                .cost[structure.level]
+                                .get("metal")
+                                .unwrap_or(&0),
+                            water: *System::get_structure_config(galaxy_config, structure.name)
+                                .cost[structure.level]
+                                .get("water")
+                                .unwrap_or(&0),
+                            crew: *System::get_structure_config(galaxy_config, structure.name).cost
                                 [structure.level]
-                                .get("gold")
-                                .unwrap_or(&0),
-                            lumber: *System::get_structure_config(galaxy_config, structure.name)
-                                .cost[structure.level]
-                                .get("lumber")
-                                .unwrap_or(&0),
-                            stone: *System::get_structure_config(galaxy_config, structure.name)
-                                .cost[structure.level]
-                                .get("stone")
+                                .get("crew")
                                 .unwrap_or(&0),
                             ticks: *System::get_structure_config(galaxy_config, structure.name)
                                 .cost[structure.level]
@@ -417,9 +426,9 @@ impl System {
         } else {
             let mut details = SystemInfo {
                 score: self.score(tick, galaxy_config),
-                gold: self.gold,
-                lumber: self.lumber,
-                stone: self.stone,
+                metal: self.metal,
+                water: self.water,
+                crew: self.crew,
                 structures: HashMap::new(),
                 production: self.get_production(tick, galaxy_config),
                 events: self.events.clone(),
