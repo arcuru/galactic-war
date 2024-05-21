@@ -293,11 +293,16 @@ impl System {
         }
     }
 
-    /// Get the score of a system
+    /// Get the score of a system.
+    ///
+    /// The score is the summation of every level of every structure in the system.
+    /// A structure with a level of 4 will contribute 1+2+3+4=10 to the score.
     pub fn score(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        // Sum the levels of each structure
-        self.structures.iter().map(|b| b.level).sum()
+        self.structures
+            .iter()
+            .map(|b| (1..=b.level).sum::<usize>())
+            .sum()
     }
 
     /// Build a structure
