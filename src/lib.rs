@@ -23,15 +23,10 @@ pub struct Galaxy {
     tick: usize,
 }
 
-/// Production of a system
+/// Production of a system.
 ///
-/// Each value is the number of ticks needed to produce each resource
-#[derive(Debug, Default)]
-pub struct SystemProduction {
-    pub metal: usize,
-    pub crew: usize,
-    pub water: usize,
-}
+/// Each value is the amount of resources produced per 3600 ticks (hour).
+type SystemProduction = Resources;
 
 /// Resources in a system.
 #[derive(Clone, Debug, Default)]
@@ -79,8 +74,15 @@ impl std::ops::Mul<usize> for Resources {
 
 #[derive(Debug, Default)]
 pub struct SystemInfo {
+    /// Computed score of the system
     pub score: usize,
+
+    /// Resources in the system.
     pub resources: Resources,
+
+    /// Production of the system.
+    ///
+    /// Given in units per hour (3600 ticks).
     pub production: SystemProduction,
 
     /// Structure levels

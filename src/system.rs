@@ -162,13 +162,13 @@ impl System {
     }
 
     /// Get the resource production of a single structure
+    ///
+    /// REQUIRES the events to already be up to date
     fn get_structure_production(
-        &mut self,
-        tick: usize,
+        &self,
         galaxy_config: &GalaxyConfig,
         structure: StructureType,
     ) -> SystemProduction {
-        self.process_events(tick, galaxy_config);
         let mut production = SystemProduction {
             metal: 0,
             crew: 0,
@@ -199,24 +199,16 @@ impl System {
     /// Get the production of the system
     fn get_production(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> SystemProduction {
         self.process_events(tick, galaxy_config);
-        // Get the metal production
-        let metal = {
-            let config = System::get_structure_config(galaxy_config, StructureType::AsteroidMine);
-            config.production.as_ref().unwrap()[0].production
-                [self.structure_level(StructureType::AsteroidMine)]
+        let mut production = SystemProduction {
+            metal: 0,
+            crew: 0,
+            water: 0,
         };
-        let crew = {
-            let config = System::get_structure_config(galaxy_config, StructureType::Hatchery);
-            config.production.as_ref().unwrap()[0].production
-                [self.structure_level(StructureType::Hatchery)]
-        };
-        let water = {
-            let config = System::get_structure_config(galaxy_config, StructureType::WaterHarvester);
-            config.production.as_ref().unwrap()[0].production
-                [self.structure_level(StructureType::WaterHarvester)]
-        };
-
-        SystemProduction { metal, crew, water }
+        for structure in self.structures.iter() {
+            production =
+                production.clone() + self.get_structure_production(galaxy_config, structure.name);
+        }
+        production
     }
 
     /// Callback for events
@@ -402,7 +394,7 @@ impl System {
         if let Some(structure) = structure {
             let mut details = StructureInfo {
                 level: self.structure_level(structure),
-                production: Some(self.get_structure_production(tick, galaxy_config, structure)),
+                production: Some(self.get_structure_production(galaxy_config, structure)),
                 builds: None,
             };
             if structure == StructureType::Colony {
