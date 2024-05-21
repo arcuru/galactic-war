@@ -355,6 +355,10 @@ impl System {
         structure: StructureType,
     ) -> Result<Event, String> {
         self.process_events(tick, galaxy_config);
+        // Check if we're already building a structure, we can only build one at a time
+        if self.events.iter().any(|e| e.structure.is_some()) {
+            return Err("Already building a structure".to_string());
+        }
         if self.structure(structure).is_some() {
             // Verify if the structure can be built
             let cost = &System::get_structure_config(galaxy_config, structure).cost
