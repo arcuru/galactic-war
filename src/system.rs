@@ -75,10 +75,11 @@ impl System {
     ///
     /// This takes an SystemConfig because there may be multiple system types in future
     pub fn new(tick: usize, system_config: &SystemConfig, galaxy_config: &GalaxyConfig) -> Self {
-        let metal = *system_config.resources.get("metal").unwrap_or(&0);
-        let water = *system_config.resources.get("water").unwrap_or(&0);
-        let crew = *system_config.resources.get("crew").unwrap_or(&0);
-        let resources = Resources { metal, water, crew };
+        let resources = Resources {
+            metal: *system_config.resources.get("metal").unwrap_or(&0),
+            water: *system_config.resources.get("water").unwrap_or(&0),
+            crew: *system_config.resources.get("crew").unwrap_or(&0),
+        };
         let mut structures = Vec::new();
         for (name, structure) in system_config.structures.iter() {
             structures.push(Structure {
@@ -285,20 +286,23 @@ impl System {
 
     /// Get the current metal amount
     pub fn metal(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
-        self.process_events(tick, galaxy_config);
-        self.resources.metal
+        self.resources(tick, galaxy_config).water
     }
 
     /// Get the current water amount
     pub fn water(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
-        self.process_events(tick, galaxy_config);
-        self.resources.water
+        self.resources(tick, galaxy_config).water
     }
 
     /// Get the current crew count
     pub fn crew(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
+        self.resources(tick, galaxy_config).crew
+    }
+
+    /// Get the current resources of the system
+    pub fn resources(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> Resources {
         self.process_events(tick, galaxy_config);
-        self.resources.crew
+        self.resources.clone()
     }
 
     /// Check if there is an event that needs to be processed
@@ -360,9 +364,12 @@ impl System {
                 && self.resources.crew >= *cost.get("crew").unwrap_or(&0)
             {
                 // Deduct the cost
-                self.resources.metal -= cost.get("metal").unwrap_or(&0);
-                self.resources.water -= cost.get("water").unwrap_or(&0);
-                self.resources.crew -= cost.get("crew").unwrap_or(&0);
+                self.resources = self.resources.clone()
+                    - Resources {
+                        metal: *cost.get("metal").unwrap_or(&0),
+                        water: *cost.get("water").unwrap_or(&0),
+                        crew: *cost.get("crew").unwrap_or(&0),
+                    };
                 // Increase the level
                 let event = Event {
                     completion: tick + cost.get("time").unwrap_or(&1),

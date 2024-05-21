@@ -41,6 +41,42 @@ pub struct Resources {
     pub water: usize,
 }
 
+impl std::ops::Add for Resources {
+    type Output = Resources;
+
+    fn add(self, other: Resources) -> Resources {
+        Resources {
+            metal: self.metal + other.metal,
+            crew: self.crew + other.crew,
+            water: self.water + other.water,
+        }
+    }
+}
+
+impl std::ops::Sub for Resources {
+    type Output = Resources;
+
+    fn sub(self, other: Resources) -> Resources {
+        Resources {
+            metal: self.metal - other.metal,
+            crew: self.crew - other.crew,
+            water: self.water - other.water,
+        }
+    }
+}
+
+impl std::ops::Mul<usize> for Resources {
+    type Output = Resources;
+
+    fn mul(self, other: usize) -> Resources {
+        Resources {
+            metal: self.metal * other,
+            crew: self.crew * other,
+            water: self.water * other,
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SystemInfo {
     pub score: usize,
