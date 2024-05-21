@@ -1,6 +1,7 @@
 use axum::response::Html;
 use galactic_war::{
-    config::GalaxyConfig, Coords, Details, Event, EventCallback, Galaxy, StructureType, SystemInfo,
+    config::GalaxyConfig, Coords, Details, Event, EventCallback, Galaxy, Resources, StructureType,
+    SystemInfo,
 };
 
 use axum::{extract::Path, routing::get, Router};
@@ -123,7 +124,7 @@ async fn colony_get(
     let dets = structure_info(&galaxy, (x, y).into(), "Colony");
 
     let system_info = system_info(&galaxy, (x, y).into()).unwrap();
-    let mut page = resource_table(system_info.metal, system_info.crew, system_info.water);
+    let mut page = resource_table(&system_info.resources);
 
     // Push the table header
     page.push_str("<p><table width=600 border=0 cellspacing=1 cellpadding=3>");
@@ -156,9 +157,9 @@ async fn colony_get(
             seconds_to_readable(cost.ticks)
         ));
 
-        if system_info.metal >= cost.metal
-            && system_info.crew >= cost.crew
-            && system_info.water >= cost.water
+        if system_info.resources.metal >= cost.metal
+            && system_info.resources.crew >= cost.crew
+            && system_info.resources.water >= cost.water
         {
             page.push_str(&format!(
                 "<td bgcolor=dddddd width=200><a href=/{}/{}/{}/{}/build>Upgrade to level {}</a></td></tr>",
@@ -166,7 +167,7 @@ async fn colony_get(
         } else {
             // Figure out how long it will take to produce the missing resources at the current rate
             let metal_time = {
-                let metal = cost.metal as isize - system_info.metal as isize;
+                let metal = cost.metal as isize - system_info.resources.metal as isize;
                 if metal > 0 {
                     metal as usize * system_info.production.metal
                 } else {
@@ -174,17 +175,17 @@ async fn colony_get(
                 }
             };
             let crew_time = {
-                let crew = cost.crew as isize - system_info.crew as isize;
+                let crew = cost.crew as isize - system_info.resources.crew as isize;
                 if crew > 0 {
-                    crew as usize * system_info.production.water
+                    crew as usize * system_info.production.crew
                 } else {
                     0
                 }
             };
             let water_time = {
-                let water = cost.water as isize - system_info.water as isize;
+                let water = cost.water as isize - system_info.resources.water as isize;
                 if water > 0 {
-                    water as usize * system_info.production.crew
+                    water as usize * system_info.production.water
                 } else {
                     0
                 }
@@ -239,9 +240,9 @@ fn structure_info(galaxy: &str, coords: Coords, structure: &str) -> Result<Detai
 }
 
 /// Return a standardized HTML table for displaying resources
-fn resource_table(metal: usize, crew: usize, water: usize) -> String {
+fn resource_table(resources: &Resources) -> String {
     format!("<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td width=33%>💰 {}</td><td width=33%>🪨 {}</td><td>🪵 {}</td></tr></table>",
-metal, crew, water)
+resources.metal, resources.crew, resources.water)
 }
 
 /// Handler for GET requests to /:galaxy/:x/:y
@@ -252,7 +253,7 @@ async fn system_get(
 
     let mut page = format!("{}<br>
 <table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>",
-resource_table(system_info.metal, system_info.crew, system_info.water));
+resource_table(&system_info.resources));
 
     for (structure, level) in system_info.structures.iter() {
         page.push_str(&format!(
@@ -348,7 +349,7 @@ async fn galaxy_stats_get(Path(galaxy): Path<String>) -> Result<Html<String>, St
                 }
                 page.push_str(&format!(
                 "<tr><td bgcolor=#ffffff><a href=/{}/{}/{}>{} ({}:{})</a></td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff>{}</td><td bgcolor=#ffffff title=\"{}\">{}</td></tr>",
-                galaxy, addr.x, addr.y, "System", addr.x, addr.y, info.metal, info.crew, info.water, activity_hover, activity
+                galaxy, addr.x, addr.y, "System", addr.x, addr.y, info.resources.metal, info.resources.crew, info.resources.water, activity_hover, activity
             ));
             }
             _ => {

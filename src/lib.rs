@@ -33,12 +33,18 @@ pub struct SystemProduction {
     pub water: usize,
 }
 
+/// Resources in a system.
+#[derive(Clone, Debug, Default)]
+pub struct Resources {
+    pub metal: usize,
+    pub crew: usize,
+    pub water: usize,
+}
+
 #[derive(Debug, Default)]
 pub struct SystemInfo {
     pub score: usize,
-    pub metal: usize,
-    pub water: usize,
-    pub crew: usize,
+    pub resources: Resources,
     pub production: SystemProduction,
 
     /// Structure levels

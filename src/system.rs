@@ -2,18 +2,20 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::config::{GalaxyConfig, StructureConfig, SystemConfig};
-use crate::{Cost, Details, StructureInfo, SystemInfo, SystemProduction};
+use crate::{Cost, Details, Resources, StructureInfo, SystemInfo, SystemProduction};
 use std::fmt;
 use std::str::FromStr;
 
 /// An System in the Galaxy
 #[derive(Debug, Default)]
 pub struct System {
-    /// List of events that are happening in the system
+    /// List of events that are happening in the system.
     events: Vec<Event>,
-    metal: usize,
-    water: usize,
-    crew: usize,
+
+    /// Current resources available in the system.
+    resources: Resources,
+
+    /// List of structures in the system.
     structures: Vec<Structure>,
 }
 
@@ -76,6 +78,7 @@ impl System {
         let metal = *system_config.resources.get("metal").unwrap_or(&0);
         let water = *system_config.resources.get("water").unwrap_or(&0);
         let crew = *system_config.resources.get("crew").unwrap_or(&0);
+        let resources = Resources { metal, water, crew };
         let mut structures = Vec::new();
         for (name, structure) in system_config.structures.iter() {
             structures.push(Structure {
@@ -124,9 +127,7 @@ impl System {
 
         Self {
             events,
-            metal,
-            water,
-            crew,
+            resources,
             structures,
         }
     }
@@ -228,7 +229,7 @@ impl System {
         }
         match event.action {
             EventCallback::Metal => {
-                self.metal += 1;
+                self.resources.metal += 1;
                 // Create a new event for the next metal piece
                 let time = System::get_structure_config(galaxy_config, StructureType::AsteroidMine)
                     .production
@@ -242,21 +243,7 @@ impl System {
                 });
             }
             EventCallback::Water => {
-                self.water += 1;
-                // Create a new event for the next crew member
-                let time = System::get_structure_config(galaxy_config, StructureType::Hatchery)
-                    .production
-                    .as_ref()
-                    .unwrap()[0]
-                    .production[self.structure_level(StructureType::Hatchery)];
-                self.register_event(Event {
-                    completion: event.completion + time,
-                    action: EventCallback::Water,
-                    structure: None,
-                });
-            }
-            EventCallback::Crew => {
-                self.crew += 1;
+                self.resources.water += 1;
                 // Create a new event for the next water unit
                 let time =
                     System::get_structure_config(galaxy_config, StructureType::WaterHarvester)
@@ -264,6 +251,20 @@ impl System {
                         .as_ref()
                         .unwrap()[0]
                         .production[self.structure_level(StructureType::WaterHarvester)];
+                self.register_event(Event {
+                    completion: event.completion + time,
+                    action: EventCallback::Water,
+                    structure: None,
+                });
+            }
+            EventCallback::Crew => {
+                self.resources.crew += 1;
+                // Create a new event for the next crew member
+                let time = System::get_structure_config(galaxy_config, StructureType::Hatchery)
+                    .production
+                    .as_ref()
+                    .unwrap()[0]
+                    .production[self.structure_level(StructureType::Hatchery)];
                 self.register_event(Event {
                     completion: event.completion + time,
                     action: EventCallback::Crew,
@@ -285,19 +286,19 @@ impl System {
     /// Get the current metal amount
     pub fn metal(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        self.metal
+        self.resources.metal
     }
 
     /// Get the current water amount
     pub fn water(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        self.water
+        self.resources.water
     }
 
     /// Get the current crew count
     pub fn crew(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> usize {
         self.process_events(tick, galaxy_config);
-        self.crew
+        self.resources.crew
     }
 
     /// Check if there is an event that needs to be processed
@@ -354,14 +355,14 @@ impl System {
             // Verify if the structure can be built
             let cost = &System::get_structure_config(galaxy_config, structure).cost
                 [self.structure_level(structure)];
-            if self.metal >= *cost.get("metal").unwrap_or(&0)
-                && self.water >= *cost.get("water").unwrap_or(&0)
-                && self.crew >= *cost.get("stone").unwrap_or(&0)
+            if self.resources.metal >= *cost.get("metal").unwrap_or(&0)
+                && self.resources.water >= *cost.get("water").unwrap_or(&0)
+                && self.resources.crew >= *cost.get("crew").unwrap_or(&0)
             {
                 // Deduct the cost
-                self.metal -= cost.get("metal").unwrap_or(&0);
-                self.water -= cost.get("water").unwrap_or(&0);
-                self.crew -= cost.get("stone").unwrap_or(&0);
+                self.resources.metal -= cost.get("metal").unwrap_or(&0);
+                self.resources.water -= cost.get("water").unwrap_or(&0);
+                self.resources.crew -= cost.get("crew").unwrap_or(&0);
                 // Increase the level
                 let event = Event {
                     completion: tick + cost.get("time").unwrap_or(&1),
@@ -426,9 +427,7 @@ impl System {
         } else {
             let mut details = SystemInfo {
                 score: self.score(tick, galaxy_config),
-                metal: self.metal,
-                water: self.water,
-                crew: self.crew,
+                resources: self.resources.clone(),
                 structures: HashMap::new(),
                 production: self.get_production(tick, galaxy_config),
                 events: self.events.clone(),
