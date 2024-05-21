@@ -15,7 +15,7 @@ pub struct Galaxy {
     config: GalaxyConfig,
 
     /// All the systems in the galaxy
-    systems: HashMap<(usize, usize), System>,
+    systems: HashMap<Coords, System>,
 
     /// The most recent tick
     ///
@@ -85,14 +85,17 @@ impl Galaxy {
     /// Uses a custom configuration struct to set up all the details
     pub fn new(config: GalaxyConfig, initial_tick: usize) -> Self {
         let mut systems = HashMap::new();
+        let mut rng = rand::thread_rng();
         for _ in 0..config.system_count {
             // Create a new island at a random location in the 2d space
-
-            let mut rng = rand::thread_rng();
             let x: usize = rng.gen_range(0..=config.size.x);
             let y: usize = rng.gen_range(0..=config.size.y);
+            if systems.contains_key(&(x, y).into()) {
+                // Already have a system here, try again
+                continue;
+            }
             let system = System::new(initial_tick, &config.systems, &config);
-            systems.insert((x, y), system);
+            systems.insert((x, y).into(), system);
         }
         Self {
             config,
@@ -105,11 +108,11 @@ impl Galaxy {
     pub fn get_details(
         &mut self,
         tick: usize,
-        (x, y): (usize, usize),
+        coords: Coords,
         structure: Option<StructureType>,
     ) -> Result<Details, String> {
         self.update_tick(tick)?;
-        let island = self.systems.get_mut(&(x, y)).unwrap();
+        let island = self.systems.get_mut(&coords).unwrap();
         island.get_details(tick, &self.config, structure)
     }
 
@@ -129,7 +132,7 @@ impl Galaxy {
     }
 
     /// Retrieve the full list of systems
-    pub fn systems(&self) -> &HashMap<(usize, usize), System> {
+    pub fn systems(&self) -> &HashMap<Coords, System> {
         &self.systems
     }
 
@@ -137,11 +140,11 @@ impl Galaxy {
     pub fn build(
         &mut self,
         tick: usize,
-        (x, y): (usize, usize),
+        coords: Coords,
         structure: StructureType,
     ) -> Result<Event, String> {
         self.update_tick(tick)?;
-        let system = self.systems.get_mut(&(x, y)).unwrap();
+        let system = self.systems.get_mut(&coords).unwrap();
         system.build(tick, &self.config, structure)
     }
 
@@ -152,5 +155,21 @@ impl Galaxy {
         }
         self.tick = tick;
         Ok(())
+    }
+}
+
+/// Coords for systems
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Coords {
+    pub x: usize,
+    pub y: usize,
+}
+
+impl From<(usize, usize)> for Coords {
+    fn from(coords: (usize, usize)) -> Self {
+        Coords {
+            x: coords.0,
+            y: coords.1,
+        }
     }
 }

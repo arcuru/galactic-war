@@ -1,6 +1,6 @@
 use axum::response::Html;
 use galactic_war::{
-    config::GalaxyConfig, Details, Event, EventCallback, Galaxy, StructureType, SystemInfo,
+    config::GalaxyConfig, Coords, Details, Event, EventCallback, Galaxy, StructureType, SystemInfo,
 };
 
 use axum::{extract::Path, routing::get, Router};
@@ -10,14 +10,6 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-
-/// Coords for systems
-///
-/// TODO: Integrate this everywhere
-struct Coords {
-    x: usize,
-    y: usize,
-}
 
 lazy_static::lazy_static! {
     // Safely share the galaxies between threads
@@ -128,9 +120,9 @@ async fn galaxy_create_get(Path(galaxy): Path<String>) -> String {
 async fn fortress_get(
     Path((galaxy, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
-    let dets = structure_info(&galaxy, (x, y), "Fortress");
+    let dets = structure_info(&galaxy, (x, y).into(), "Fortress");
 
-    let system_info = system_info(&galaxy, (x, y)).unwrap();
+    let system_info = system_info(&galaxy, (x, y).into()).unwrap();
     let mut page = resource_table(system_info.gold, system_info.stone, system_info.lumber);
 
     // Push the table header
@@ -223,7 +215,7 @@ async fn fortress_get(
 async fn structure_get(
     Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    let dets = structure_info(&galaxy, (x, y), &structure);
+    let dets = structure_info(&galaxy, (x, y).into(), &structure);
     if let Ok(dets) = dets {
         Ok(format!("{:?}", dets))
     } else {
@@ -232,16 +224,12 @@ async fn structure_get(
 }
 
 /// Retrieve the details of a structure in a system
-fn structure_info(
-    galaxy: &str,
-    (x, y): (usize, usize),
-    structure: &str,
-) -> Result<Details, String> {
+fn structure_info(galaxy: &str, coords: Coords, structure: &str) -> Result<Details, String> {
     let mut galaxies = GALAXIES.lock().unwrap();
     if let Some(galaxy) = galaxies.get_mut(galaxy) {
         let structure_type = StructureType::from_str(structure);
         if let Ok(structure) = structure_type {
-            galaxy.get_details(tick(), (x, y), Some(structure))
+            galaxy.get_details(tick(), coords, Some(structure))
         } else {
             Err("Structure not found".to_string())
         }
@@ -260,7 +248,7 @@ gold, stone, lumber)
 async fn system_get(
     Path((galaxy, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
-    let system_info = system_info(&galaxy, (x, y))?;
+    let system_info = system_info(&galaxy, (x, y).into())?;
 
     let mut page = format!("{}<br>
 <table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>",
@@ -286,10 +274,10 @@ resource_table(system_info.gold, system_info.stone, system_info.lumber));
 }
 
 /// Retrieve the details of an system
-fn system_info(galaxy: &str, (x, y): (usize, usize)) -> Result<SystemInfo, String> {
+fn system_info(galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
     let mut galaxies = GALAXIES.lock().unwrap();
     if let Some(galaxy) = galaxies.get_mut(galaxy) {
-        let dets = galaxy.get_details(tick(), (x, y), None);
+        let dets = galaxy.get_details(tick(), coords, None);
         if let Ok(dets) = dets {
             match dets {
                 Details::System(info) => Ok(info),
@@ -307,7 +295,7 @@ fn system_info(galaxy: &str, (x, y): (usize, usize)) -> Result<SystemInfo, Strin
 async fn build_structure_get(
     Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    let event = build_structure(&galaxy, (x, y), &structure);
+    let event = build_structure(&galaxy, (x, y).into(), &structure);
     if let Ok(event) = event {
         Ok(format!("{:?}", event))
     } else {
@@ -316,12 +304,12 @@ async fn build_structure_get(
 }
 
 /// Send the structure request and return the internal type
-fn build_structure(galaxy: &str, (x, y): (usize, usize), structure: &str) -> Result<Event, String> {
+fn build_structure(galaxy: &str, coords: Coords, structure: &str) -> Result<Event, String> {
     let mut galaxies = GALAXIES.lock().unwrap();
     if let Some(galaxy) = galaxies.get_mut(galaxy) {
         let structure_type = StructureType::from_str(structure);
         if let Ok(structure) = structure_type {
-            galaxy.build(tick(), (x, y), structure)
+            galaxy.build(tick(), coords, structure)
         } else {
             Err("Structure not found".to_string())
         }
@@ -385,13 +373,7 @@ fn galaxy_info(galaxy: &str) -> Result<Vec<(Coords, Details)>, String> {
     if let Some(galaxy) = galaxies.get_mut(galaxy) {
         let addresses = galaxy.systems().keys().cloned().collect::<Vec<_>>();
         for addr in addresses {
-            system_info.push((
-                Coords {
-                    x: addr.0,
-                    y: addr.1,
-                },
-                galaxy.get_details(tick(), addr, None).unwrap(),
-            ));
+            system_info.push((addr, galaxy.get_details(tick(), addr, None).unwrap()));
         }
         Ok(system_info)
     } else {
