@@ -87,50 +87,43 @@ impl System {
                 level: structure.starting_level.unwrap_or(0),
             });
         }
-        // Kick off events for the structures
-        let mut events = Vec::new();
-        for structure in structures.iter() {
-            match structure.name {
-                StructureType::AsteroidMine => {
-                    let config =
-                        System::get_structure_config(galaxy_config, StructureType::AsteroidMine);
-                    let metal = &config.production.as_ref().unwrap()[0]; // FIXME: allow different resources?
-                    events.push(Event {
-                        completion: tick + metal.production[structure.level],
-                        action: EventCallback::Metal,
-                        structure: None,
-                    });
-                }
-                StructureType::Hatchery => {
-                    let config =
-                        System::get_structure_config(galaxy_config, StructureType::Hatchery);
-                    let crew = &config.production.as_ref().unwrap()[0]; // FIXME: allow different resources?
-                    events.push(Event {
-                        completion: tick + crew.production[structure.level],
-                        action: EventCallback::Water,
-                        structure: None,
-                    });
-                }
-                StructureType::WaterHarvester => {
-                    let config =
-                        System::get_structure_config(galaxy_config, StructureType::WaterHarvester);
-                    let water = &config.production.as_ref().unwrap()[0]; // FIXME: allow different resources?
-                    events.push(Event {
-                        completion: tick + water.production[structure.level],
-                        action: EventCallback::Crew,
-                        structure: None,
-                    });
-                }
-                _ => {}
-            }
-        }
-        events.sort_by_key(|e| e.completion);
-
-        Self {
-            events,
+        let mut new_system = Self {
+            events: Vec::new(),
             resources,
             structures,
-        }
+        };
+
+        // Kick off initial production events
+        // Yes, this adds a new resource of every type
+        new_system.event_callback(
+            tick,
+            galaxy_config,
+            Event {
+                completion: tick,
+                action: EventCallback::Metal,
+                structure: None,
+            },
+        );
+        new_system.event_callback(
+            tick,
+            galaxy_config,
+            Event {
+                completion: tick,
+                action: EventCallback::Crew,
+                structure: None,
+            },
+        );
+        new_system.event_callback(
+            tick,
+            galaxy_config,
+            Event {
+                completion: tick,
+                action: EventCallback::Water,
+                structure: None,
+            },
+        );
+
+        new_system
     }
 
     /// Get the index of the structure by type
@@ -161,41 +154,6 @@ impl System {
             .unwrap()
     }
 
-    /// Get the resource production of a single structure
-    ///
-    /// REQUIRES the events to already be up to date
-    fn get_structure_production(
-        &self,
-        galaxy_config: &GalaxyConfig,
-        structure: StructureType,
-    ) -> SystemProduction {
-        let mut production = SystemProduction {
-            metal: 0,
-            crew: 0,
-            water: 0,
-        };
-        match structure {
-            StructureType::AsteroidMine => {
-                let config =
-                    System::get_structure_config(galaxy_config, StructureType::AsteroidMine);
-                production.metal = config.production.as_ref().unwrap()[0].production
-                    [self.structure_level(StructureType::AsteroidMine)];
-            }
-            StructureType::Hatchery => {
-                let config = System::get_structure_config(galaxy_config, StructureType::Hatchery);
-                production.crew = config.production.as_ref().unwrap()[0].production
-                    [self.structure_level(StructureType::Hatchery)];
-            }
-            StructureType::WaterHarvester => {
-                let config = System::get_structure_config(galaxy_config, StructureType::Hatchery);
-                production.water = config.production.as_ref().unwrap()[0].production
-                    [self.structure_level(StructureType::WaterHarvester)];
-            }
-            _ => {}
-        };
-        production
-    }
-
     /// Get the production of the system
     fn get_production(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> SystemProduction {
         self.process_events(tick, galaxy_config);
@@ -205,8 +163,17 @@ impl System {
             water: 0,
         };
         for structure in self.structures.iter() {
-            production =
-                production.clone() + self.get_structure_production(galaxy_config, structure.name);
+            let production_config = galaxy_config
+                .get_structure_production(&structure.name.to_string(), structure.level);
+            if let Some(metal) = production_config.metal {
+                production.metal += metal;
+            }
+            if let Some(crew) = production_config.crew {
+                production.crew += crew;
+            }
+            if let Some(water) = production_config.water {
+                production.water += water;
+            }
         }
         production
     }
@@ -223,46 +190,40 @@ impl System {
         match event.action {
             EventCallback::Metal => {
                 self.resources.metal += 1;
-                // Create a new event for the next metal piece
-                let time = System::get_structure_config(galaxy_config, StructureType::AsteroidMine)
-                    .production
-                    .as_ref()
-                    .unwrap()[0]
-                    .production[self.structure_level(StructureType::AsteroidMine)];
-                self.register_event(Event {
-                    completion: event.completion + time,
-                    action: EventCallback::Metal,
-                    structure: None,
-                });
+                let production = self.get_production(tick, galaxy_config);
+                if production.metal > 0 {
+                    // Create a new event for the next metal piece
+                    self.register_event(Event {
+                        completion: event.completion + (3600 / production.metal),
+                        action: EventCallback::Metal,
+                        structure: None,
+                    });
+                }
             }
             EventCallback::Water => {
                 self.resources.water += 1;
-                // Create a new event for the next water unit
-                let time =
-                    System::get_structure_config(galaxy_config, StructureType::WaterHarvester)
-                        .production
-                        .as_ref()
-                        .unwrap()[0]
-                        .production[self.structure_level(StructureType::WaterHarvester)];
-                self.register_event(Event {
-                    completion: event.completion + time,
-                    action: EventCallback::Water,
-                    structure: None,
-                });
+                let production = self.get_production(tick, galaxy_config);
+                if production.water > 0 {
+                    // Create a new event for the next water unit
+                    self.register_event(Event {
+                        completion: event.completion + (3600 / production.water),
+                        action: EventCallback::Water,
+                        structure: None,
+                    });
+                }
             }
             EventCallback::Crew => {
                 self.resources.crew += 1;
                 // Create a new event for the next crew member
-                let time = System::get_structure_config(galaxy_config, StructureType::Hatchery)
-                    .production
-                    .as_ref()
-                    .unwrap()[0]
-                    .production[self.structure_level(StructureType::Hatchery)];
-                self.register_event(Event {
-                    completion: event.completion + time,
-                    action: EventCallback::Crew,
-                    structure: None,
-                });
+                let production = self.get_production(tick, galaxy_config);
+                if production.crew > 0 {
+                    // Create a new event for the next crew member
+                    self.register_event(Event {
+                        completion: event.completion + (3600 / production.crew),
+                        action: EventCallback::Crew,
+                        structure: None,
+                    });
+                }
             }
             EventCallback::Build => {
                 // Build the structure
@@ -392,9 +353,15 @@ impl System {
     ) -> Result<Details, String> {
         self.process_events(tick, galaxy_config);
         if let Some(structure) = structure {
+            let production_config = galaxy_config
+                .get_structure_production(&structure.to_string(), self.structure_level(structure));
             let mut details = StructureInfo {
                 level: self.structure_level(structure),
-                production: Some(self.get_structure_production(galaxy_config, structure)),
+                production: Some(Resources {
+                    metal: production_config.metal.unwrap_or(0),
+                    water: production_config.water.unwrap_or(0),
+                    crew: production_config.crew.unwrap_or(0),
+                }),
                 builds: None,
             };
             if structure == StructureType::Colony {

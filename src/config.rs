@@ -33,10 +33,14 @@ pub struct SystemConfig {
     pub resources: HashMap<String, usize>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-pub struct Production {
-    pub resource: String,
-    pub production: Vec<usize>,
+/// Production Configuration.
+///
+/// These are all in production per hour (3600 ticks).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct ProductionConfig {
+    pub metal: Option<usize>,
+    pub crew: Option<usize>,
+    pub water: Option<usize>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -48,7 +52,7 @@ pub struct StructureConfig {
     /// Used to specify how many of each resource is produced
     ///
     /// The number of ticks needed to produce the resource at a level
-    pub production: Option<Vec<Production>>,
+    pub production: Option<Vec<ProductionConfig>>,
 
     /// Used as a multiplier for the production.
     ///
@@ -64,6 +68,17 @@ pub struct StructureConfig {
     ///
     /// The highest given cost value will be multiplied by this value.
     pub cost_multiplier: Option<f64>,
+}
+
+impl GalaxyConfig {
+    /// Get the production for a single structure at a given level.
+    pub fn get_structure_production(&self, structure: &str, level: usize) -> ProductionConfig {
+        if let Some(structure) = self.systems.structures.get(structure) {
+            structure.get_production(level)
+        } else {
+            ProductionConfig::default()
+        }
+    }
 }
 
 impl StructureConfig {
@@ -89,6 +104,41 @@ impl StructureConfig {
             cost
         } else {
             panic!("No cost found for level {}", level);
+        }
+    }
+
+    /// Get the production for this structure at a given level.
+    pub fn get_production(&self, level: usize) -> ProductionConfig {
+        // Adjust for the starting level
+        let index = if let Some(lvl) = self.starting_level {
+            level - lvl
+        } else {
+            level
+        };
+        if let Some(production) = &self.production {
+            if index < production.len() {
+                production[index].clone()
+            } else if let Some(multiplier) = self.production_multiplier {
+                // Get the last entry in the production vector and it's index
+                let (last_level, last_production) = production.iter().enumerate().last().unwrap();
+                let exponent = index - last_level;
+                let multiplier = multiplier.powi(exponent as i32);
+                let mut production = last_production.clone();
+                if let Some(metal) = production.metal {
+                    production.metal = Some((metal as f64 * multiplier) as usize);
+                }
+                if let Some(crew) = production.crew {
+                    production.crew = Some((crew as f64 * multiplier) as usize);
+                }
+                if let Some(water) = production.water {
+                    production.water = Some((water as f64 * multiplier) as usize);
+                }
+                production.clone()
+            } else {
+                panic!("No production found for level {}", level);
+            }
+        } else {
+            ProductionConfig::default()
         }
     }
 }

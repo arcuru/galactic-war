@@ -148,7 +148,7 @@ impl Galaxy {
         }
     }
 
-    /// Retrieve the details of an island, possibly scoped to a specific structure
+    /// Retrieve the details of a system, possibly scoped to a specific structure
     pub fn get_details(
         &mut self,
         tick: usize,
@@ -156,8 +156,8 @@ impl Galaxy {
         structure: Option<StructureType>,
     ) -> Result<Details, String> {
         self.update_tick(tick)?;
-        let island = self.systems.get_mut(&coords).unwrap();
-        island.get_details(tick, &self.config, structure)
+        let system = self.systems.get_mut(&coords).unwrap();
+        system.get_details(tick, &self.config, structure)
     }
 
     /// Return basic stats about the Galaxy

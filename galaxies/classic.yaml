@@ -8,23 +8,21 @@ size:
   y: 100
 systems:
   resources:
-    crew: 1
-    metal: 1
-    water: 1
+    crew: 200
+    metal: 225
+    water: 250
   structures:
     colony:
       description: "The colony is the heart of your empire. It is where you can build and upgrade structures. Upgrading your colony will allow you to build more structures."
       starting_level: 1
-      #production_multiplier: 1.2 # Explicitly smaller than the production multipliers for the other structures
+      production_multiplier: 1.2 # Explicitly smaller than the production multipliers for the other structures
       production:
-        - resource: crew
-          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-        - resource: metal
-          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-        - resource: water
-          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        - crew: 5
+          metal: 6
+          water: 7
       cost_multiplier: 1.25
       cost:
+        # This is here to avoid a bug
         - crew: 5
           metal: 5
           water: 5
@@ -37,22 +35,22 @@ systems:
     hatchery:
       description: "The hatchery is where you can produce crew members. The more crew members you have, the more you can do."
       starting_level: 0
-      cost_multiplier: 1.25
-      # Time to produce 1 crew member at a given level
+      production_multiplier: 1.25
       production:
-        - resource: crew
-          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        - crew: 5
+      cost_multiplier: 1.25
       cost:
         - time: 100
-        - crew: 5
-          time: 125
+          crew: 50
+          metal: 60
+          water: 70
     asteroidmine:
       description: "Mine the astroid fields for precious and not so precious metals."
       starting_level: 0
       production:
-        - resource: metal
-          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        - metal: 6
       cost_multiplier: 1.25
+      production_multiplier: 1.25
       cost:
         - metal: 10
           water: 10
@@ -61,8 +59,9 @@ systems:
     waterharvester:
       description: "Operate water harvesters to collect water from comets and frozen worlds."
       production:
-        - resource: water
-          production: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        - water: 7
+      cost_multiplier: 1.25
+      production_multiplier: 1.25
       cost:
         - metal: 10
           water: 10
