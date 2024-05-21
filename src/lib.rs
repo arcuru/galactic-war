@@ -40,6 +40,7 @@ pub struct SystemInfo {
     pub lumber: usize,
     pub stone: usize,
     pub production: SystemProduction,
+
     /// Structure levels
     pub structures: HashMap<StructureType, usize>,
 

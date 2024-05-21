@@ -40,31 +40,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Serve the Galaxy(s) over HTTP
 async fn serve() -> Result<(), Box<dyn std::error::Error>> {
-    // All the entry points expose both a GET and POST interface
-    // The difference is just in presentation
-    // A GET request will just display an HTML page, and a POST request will return the data being used to display
-    // Internally all GET requests use the same data as returned from the POST request
+    // Only use GET requests
+    // We will eventually use an API to allow other ways of interacting with
+    // the game, likely with POST requests, but for now we will only
+    // expose the game over the web interface for simplicity
     let app = Router::new()
-        .route("/:galaxy", get(galaxy_get).post(galaxy_post))
-        .route(
-            "/:galaxy/stats",
-            get(galaxy_stats_get).post(galaxy_stats_post),
-        )
-        .route(
-            "/:galaxy/create",
-            get(galaxy_create_get).post(galaxy_create_post),
-        )
-        .route("/:galaxy/:x/:y", get(system_get).post(system_post))
-        .route("/:galaxy/:x/:y/", get(system_get).post(system_post))
+        .route("/:galaxy", get(galaxy_get))
+        .route("/:galaxy/stats", get(galaxy_stats_get))
+        .route("/:galaxy/create", get(galaxy_create_get))
+        .route("/:galaxy/:x/:y", get(system_get))
+        .route("/:galaxy/:x/:y/", get(system_get))
         .route("/:galaxy/:x/:y/fortress", get(fortress_get))
-        .route(
-            "/:galaxy/:x/:y/:structure",
-            get(structure_get).post(structure_post),
-        )
-        .route(
-            "/:galaxy/:x/:y/:structure/build",
-            get(build_structure_get).post(build_structure_post),
-        )
+        .route("/:galaxy/:x/:y/:structure", get(structure_get))
+        .route("/:galaxy/:x/:y/:structure/build", get(build_structure_get))
         .route("/", get(base_get));
 
     // Hardcode serve on port 3050
@@ -113,7 +101,7 @@ async fn base_get() -> Html<String> {
     <button onclick="navigate()">Go to galaxy</button>
     <br><br>
     <h1>Create a new galaxy</h1>
-    <form id="createGalaxy" method="post">
+    <form id="createGalaxy" method="get">
         <label for="newGalaxy">Enter New Galaxy Name:</label>
         <input type="text" id="newGalaxy" name="newGalaxy" required>
         <input type="submit" value="Submit">
@@ -126,11 +114,6 @@ async fn base_get() -> Html<String> {
 
 /// Handler for GET requests to /:galaxy/create
 async fn galaxy_create_get(Path(galaxy): Path<String>) -> String {
-    galaxy_create_post(Path(galaxy)).await
-}
-
-/// Handler for POST requests to /:galaxy/create
-async fn galaxy_create_post(Path(galaxy): Path<String>) -> String {
     let mut galaxies = GALAXIES.lock().unwrap();
     if galaxies.contains_key(&galaxy) {
         return format!("Galaxy {} already exists", galaxy);
@@ -240,7 +223,6 @@ async fn fortress_get(
 async fn structure_get(
     Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
-    println!("StructureGet: Galaxy: {}, x: {}, y: {}", galaxy, x, y);
     let dets = structure_info(&galaxy, (x, y), &structure);
     if let Ok(dets) = dets {
         Ok(format!("{:?}", dets))
@@ -249,27 +231,12 @@ async fn structure_get(
     }
 }
 
-/// Answer a POST request to the structure endpoint
-///
-/// TODO: This should respond with JSON
-async fn structure_post(
-    Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
-) -> Result<String, String> {
-    let dets = structure_info(&galaxy, (x, y), &structure);
-    if let Ok(dets) = dets {
-        Ok(format!("{:?}", dets))
-    } else {
-        Err(dets.unwrap_err())
-    }
-}
-
-/// Retrieve the details of a structure on an system
+/// Retrieve the details of a structure in a system
 fn structure_info(
     galaxy: &str,
     (x, y): (usize, usize),
     structure: &str,
 ) -> Result<Details, String> {
-    println!("StructurePost: Galaxy: {}, x: {}, y: {}", galaxy, x, y);
     let mut galaxies = GALAXIES.lock().unwrap();
     if let Some(galaxy) = galaxies.get_mut(galaxy) {
         let structure_type = StructureType::from_str(structure);
@@ -318,22 +285,6 @@ resource_table(system_info.gold, system_info.stone, system_info.lumber));
     Ok(Html::from(page.to_string()))
 }
 
-/// Handler for POST requests to /:galaxy/:x/:y
-///
-/// TODO: This should respond with JSON
-async fn system_post(Path((galaxy, x, y)): Path<(String, usize, usize)>) -> Result<String, String> {
-    let mut galaxies = GALAXIES.lock().unwrap();
-    if let Some(galaxy) = galaxies.get_mut(&galaxy) {
-        if let Ok(dets) = galaxy.get_details(tick(), (x, y), None) {
-            Ok(format!("{:?}", dets))
-        } else {
-            Err("System not found".to_string())
-        }
-    } else {
-        Err("Galaxy not found".to_string())
-    }
-}
-
 /// Retrieve the details of an system
 fn system_info(galaxy: &str, (x, y): (usize, usize)) -> Result<SystemInfo, String> {
     let mut galaxies = GALAXIES.lock().unwrap();
@@ -354,20 +305,6 @@ fn system_info(galaxy: &str, (x, y): (usize, usize)) -> Result<SystemInfo, Strin
 
 /// Handler for GET requests to /:galaxy/:x/:y/:structure/build
 async fn build_structure_get(
-    Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
-) -> Result<String, String> {
-    let event = build_structure(&galaxy, (x, y), &structure);
-    if let Ok(event) = event {
-        Ok(format!("{:?}", event))
-    } else {
-        Err(event.unwrap_err())
-    }
-}
-
-/// Handler for POST requests to /:galaxy/:x/:y/:structure/build
-///
-/// TODO: This should respond with JSON
-async fn build_structure_post(
     Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
 ) -> Result<String, String> {
     let event = build_structure(&galaxy, (x, y), &structure);
@@ -434,33 +371,11 @@ async fn galaxy_stats_get(Path(galaxy): Path<String>) -> Result<Html<String>, St
     Ok(Html::from(page.to_string()))
 }
 
-/// Handler for POST requests to /:galaxy/stats
-///
-/// TODO: This should respond with JSON
-async fn galaxy_stats_post(Path(galaxy): Path<String>) -> Result<String, String> {
-    println!("galaxy_stats_post: {}", galaxy);
-    galaxy_stats(&galaxy)
-}
-
-fn galaxy_stats(galaxy: &str) -> Result<String, String> {
-    let mut galaxies = GALAXIES.lock().unwrap();
-    if let Some(galaxy) = galaxies.get_mut(galaxy) {
-        Ok(galaxy.stats(tick()).unwrap())
-    } else {
-        Err("Galaxy not found".to_string())
-    }
-}
-
 /// Handler for GET requests to /:galaxy
 ///
 /// Serves the Galaxy Dashboard page
 async fn galaxy_get(Path(galaxy): Path<String>) -> Result<Html<String>, String> {
     galaxy_stats_get(Path(galaxy)).await
-}
-
-/// Handler for POST requests to /:galaxy
-async fn galaxy_post(Path(galaxy): Path<String>) -> String {
-    format!("Welcome to Galaxy {}!", galaxy).to_string()
 }
 
 /// Returns all the visible info for the galaxy
