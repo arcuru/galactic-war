@@ -410,7 +410,7 @@ impl System {
             for structure in self.structures.iter() {
                 details.structures.insert(structure.name, structure.level);
             }
-            Ok(Details::System(details))
+            Ok(Details::System(details.clone()))
         }
     }
 }

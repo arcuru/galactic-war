@@ -45,6 +45,9 @@ pub struct ProductionConfig {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct StructureConfig {
+    /// Description of the structure.
+    pub description: Option<String>,
+
     /// Starting level for this type of structure
     /// If not provided it is 0
     pub starting_level: Option<usize>,

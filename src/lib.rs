@@ -72,7 +72,7 @@ impl std::ops::Mul<usize> for Resources {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SystemInfo {
     /// Computed score of the system
     pub score: usize,
@@ -95,7 +95,7 @@ pub struct SystemInfo {
 }
 
 /// Struct to hold the cost for a build
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Cost {
     pub metal: usize,
     pub water: usize,
@@ -106,7 +106,7 @@ pub struct Cost {
 /// Info for a specific structure
 ///
 /// Lots of details are optional, as they don't all apply to all structures
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct StructureInfo {
     pub level: usize,
     pub production: Option<SystemProduction>,
@@ -117,7 +117,7 @@ pub struct StructureInfo {
 ///
 /// Stores SystemInfo and StructureInfo
 /// TODO: Is this really the best approach? If it's just two types, may want to just split the API.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Details {
     System(SystemInfo),
     Structure(StructureInfo),
@@ -158,6 +158,11 @@ impl Galaxy {
         self.update_tick(tick)?;
         let system = self.systems.get_mut(&coords).unwrap();
         system.get_details(tick, &self.config, structure)
+    }
+
+    /// Get a pointer to the Config
+    pub fn get_config(&self) -> &GalaxyConfig {
+        &self.config
     }
 
     /// Return basic stats about the Galaxy
