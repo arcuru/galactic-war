@@ -54,10 +54,10 @@ impl GalacticWeb {
     ///   Galaxy -> System -> Build -> Structure
     fn get_linkback(&self) -> String {
         let mut linkbuilder = format!("/{}", self.galaxy);
-        let mut links = format!("<a href=\"{}\">{}", linkbuilder, self.galaxy);
+        let mut links = format!("<a href=\"{}\">{}</a>", linkbuilder, self.galaxy);
         for (name, link) in &self.linkbacks {
             linkbuilder.push_str(&format!("/{}", link));
-            links.push_str(&format!(" -> <a href=\"{}\">{}", linkbuilder, name));
+            links.push_str(&format!(" -> <a href=\"{}\">{}</a>", linkbuilder, name));
         }
         links
     }
@@ -84,6 +84,7 @@ impl GalacticWeb {
 "#
         .to_string();
         page.push_str(&self.get_linkback());
+        page.push_str("<br><br>");
         let system_info = system_info(&self.galaxy, self.coords)?;
         page.push_str(&resource_table(&system_info.resources));
         page.push_str(self.body.as_str());

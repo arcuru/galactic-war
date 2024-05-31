@@ -166,7 +166,7 @@ async fn system_build(
         ));
 
         page.push_str(&format!(
-            "<br>Cost: 💰{}/🪨{}/🪵{}   Duration: {}</td>",
+            "<br>Cost: 💰{}/🧑{}/💧{}   Duration: {}</td>",
             cost.metal,
             cost.crew,
             cost.water,
@@ -206,14 +206,14 @@ async fn system_build(
                     0
                 }
             };
-            // Find the longest time to produce the missing resources, and the name of the typpe
+            // Find the longest time to produce the missing resources, and the name of the type
             let time = max(metal_time, max(crew_time, water_time));
             let resource = if time == metal_time {
                 "💰"
             } else if time == crew_time {
-                "🪨"
+                "🧑"
             } else {
-                "🪵"
+                "💧"
             };
 
             page.push_str(&format!(
@@ -266,13 +266,13 @@ async fn structure_get(
                     {
                         page.add("<h3>Produces:</h3><b>");
                         if let Some(metal) = production.metal {
-                            page.add(&format!("💰Metal: {}<br>", metal));
+                            page.add(&format!("💰 Metal: {} per hour<br>", metal));
                         }
                         if let Some(crew) = production.crew {
-                            page.add(&format!("🪨Crew: {}<br>", crew));
+                            page.add(&format!("🧑 Crew: {} per hour<br>", crew));
                         }
                         if let Some(water) = production.water {
-                            page.add(&format!("🪵Water: {}<br>", water));
+                            page.add(&format!("💧 Water: {} per hour<br>", water));
                         }
                         page.add("</b>");
                     }
@@ -351,8 +351,8 @@ async fn galaxy_stats_get(Path(galaxy): Path<String>) -> Result<Html<String>, St
     <table width=600 border=0 cellspacing=1 cellpadding=3>
     <tr><td align=center><b>
     <table width=600 border=0 cellspacing=1 cellpadding=3>
-    <tr><td bgcolor=dddddd><b>Isle</b></td><td bgcolor=dddddd width=15%><b>💰metal</b></td>
-    <td bgcolor=dddddd width=15%><b>🪨crews</b></td><td bgcolor=dddddd width=15%><b>🪵water</b></td><td bgcolor=dddddd width=15%><b>Activity</b></td><td width=2%></td></tr>
+    <tr><td bgcolor=dddddd><b>Isle</b></td><td bgcolor=dddddd width=15%><b>💰 Metal</b></td>
+    <td bgcolor=dddddd width=15%><b>🧑 Crew</b></td><td bgcolor=dddddd width=15%><b>💧 Water</b></td><td bgcolor=dddddd width=15%><b>Activity</b></td><td width=2%></td></tr>
 ".to_string();
     for (addr, dets) in galaxy_info(&galaxy).unwrap() {
         match dets {
