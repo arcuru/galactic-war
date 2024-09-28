@@ -14,9 +14,9 @@ lazy_static = { version = "1.4", optional = true }
 
 [features]
 default = []
-cli = ["axum", "serde_yaml", "tokio", "lazy_static"]
+bin = ["axum", "serde_yaml", "tokio", "lazy_static"]
 
 [[bin]]
 name = "galactic-war"
 path = "src/main.rs"
-required-features = ["cli"]
+required-features = ["bin"]
