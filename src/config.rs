@@ -76,9 +76,10 @@ pub struct StructureConfig {
 impl GalaxyConfig {
     /// Get the production for a single structure at a given level.
     pub fn get_structure_production(&self, structure: &str, level: usize) -> ProductionConfig {
-        if let Some(structure) = self.systems.structures.get(structure) {
+        if let Some(structure) = self.systems.structures.get(&structure.to_lowercase()) {
             structure.get_production(level)
         } else {
+            println!("No production found for {}", structure);
             ProductionConfig::default()
         }
     }

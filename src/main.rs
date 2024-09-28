@@ -14,7 +14,8 @@ use std::str::FromStr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let contents = include_str!("../galaxies/classic.yaml");
+    // FIXME: Hardcoded galaxy config
+    let contents = include_str!("../galaxies/blitz.yaml");
     let galaxy_config: GalaxyConfig = serde_yaml::from_str(contents).unwrap();
 
     // Create a new galaxy named "one"
@@ -111,7 +112,8 @@ async fn galaxy_create_get(Path(galaxy): Path<String>) -> String {
     if galaxies.contains_key(&galaxy) {
         return format!("Galaxy {} already exists", galaxy);
     }
-    let contents = include_str!("../galaxies/classic.yaml");
+    // FIXME: Hardcoded galaxy config
+    let contents = include_str!("../galaxies/blitz.yaml");
     let galaxy_config: GalaxyConfig = serde_yaml::from_str(contents).unwrap();
     galaxies.insert(galaxy.clone(), Galaxy::new(galaxy_config, tick()));
     format!("Galaxy {} created", galaxy)

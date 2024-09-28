@@ -1,6 +1,6 @@
-# Settings for a classic game of Galactic War
+# Settings for a blitz game of Galactic War
 #
-# The configuration is intended to be used as a base for a long-term game spanning multiple months of real-time play.
+# This config is used (for now) for development, but it intended for use in a blitz game.
 
 system_count: 200
 size:
@@ -8,9 +8,9 @@ size:
   y: 100
 systems:
   resources:
-    crew: 200
-    metal: 225
-    water: 250
+    crew: 1000200
+    metal: 1000225
+    water: 1000250
   structures:
     colony:
       description: "The colony is the heart of your empire. It is where you can build and upgrade structures. Upgrading your colony will allow you to build more structures."
@@ -37,7 +37,7 @@ systems:
       starting_level: 0
       production_multiplier: 1.25
       production:
-        - crew: 5
+        - crew: 50
       cost_multiplier: 1.25
       cost:
         - time: 100
@@ -48,7 +48,7 @@ systems:
       description: "Mine the astroid fields for precious and not so precious metals."
       starting_level: 0
       production:
-        - metal: 6
+        - metal: 60
       cost_multiplier: 1.25
       production_multiplier: 1.25
       cost:
@@ -59,7 +59,7 @@ systems:
     waterharvester:
       description: "Operate water harvesters to collect water from comets and frozen worlds."
       production:
-        - water: 7
+        - water: 70
       cost_multiplier: 1.25
       production_multiplier: 1.25
       cost:
