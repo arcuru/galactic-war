@@ -38,8 +38,8 @@ pub fn system_info(galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
 }
 
 /// Return a standardized HTML table for displaying resources
-pub fn resource_table(resources: &Resources) -> String {
+pub fn resource_table(resources: &Resources, production: &SystemProduction) -> String {
     // FIXME: move to web.rs
-    format!("<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td width=33%>💰 {}</td><td width=33%>🧑 {}</td><td>💧 {}</td></tr></table>",
-resources.metal, resources.crew, resources.water)
+    format!("<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td width=33%>💰 {}</td><td width=33%>🧑 {}</td><td>💧 {}</td><td>🏃 {}/{}/{}</td></tr></table>",
+resources.metal, resources.crew, resources.water, production.metal, production.crew, production.water)
 }
