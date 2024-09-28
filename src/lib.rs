@@ -26,7 +26,7 @@ pub struct Galaxy {
 /// Production of a system.
 ///
 /// Each value is the amount of resources produced per 3600 ticks (hour).
-type SystemProduction = Resources;
+pub type SystemProduction = Resources;
 
 /// Resources in a system.
 #[derive(Clone, Debug, Default)]

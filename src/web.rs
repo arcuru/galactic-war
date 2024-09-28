@@ -86,7 +86,10 @@ impl GalacticWeb {
         page.push_str(&self.get_linkback());
         page.push_str("<br><br>");
         let system_info = system_info(&self.galaxy, self.coords)?;
-        page.push_str(&resource_table(&system_info.resources));
+        page.push_str(&resource_table(
+            &system_info.resources,
+            &system_info.production,
+        ));
         page.push_str(self.body.as_str());
         page.push_str("</body>");
         Ok(Html::from(page))
