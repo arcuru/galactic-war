@@ -308,13 +308,12 @@ async fn system_get(
     Path((galaxy, x, y)): Path<(String, usize, usize)>,
 ) -> Result<Html<String>, String> {
     let system_info = system_info(&galaxy, (x, y).into())?;
+    let mut page = GalacticWeb::new(&galaxy, (x, y).into());
 
-    let mut page = format!("{}<br>
-<table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>",
-resource_table(&system_info.resources));
+    page.add(&format!("<br><table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>"));
 
     for (structure, level) in system_info.structures.iter() {
-        page.push_str(&format!(
+        page.add(&format!(
             "🛖 <a href=/{}/{}/{}/{}>{} (level {})</a><br>",
             galaxy,
             x,
@@ -325,11 +324,18 @@ resource_table(&system_info.resources));
         ));
     }
 
-    page.push_str(&format!(
+    page.add(&format!(
         "<td vAlign=top><b>Score</b><br>{}</td></tr>",
         system_info.score
     ));
-    Ok(Html::from(page.to_string()))
+
+    // Now add a link to the build page
+    page.add(&format!(
+        "<tr><td vAlign=top><br><a href=/{}/{}/{}/build>Build/Upgrade Structures</a></td></tr>",
+        galaxy, x, y
+    ));
+
+    page.get()
 }
 
 /// Send the structure request and return the internal type
