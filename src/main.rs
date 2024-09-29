@@ -310,7 +310,7 @@ async fn system_get(
     let system_info = system_info(&galaxy, (x, y).into())?;
     let mut page = GalacticWeb::new(&galaxy, (x, y).into());
 
-    page.add(&format!("<br><table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>"));
+    page.add("<br><table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>");
 
     for (structure, level) in system_info.structures.iter() {
         page.add(&format!(
