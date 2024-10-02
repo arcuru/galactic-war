@@ -25,7 +25,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: arcuru/pokem
+          images: arcuru/galactic-war
 
       - name: Login to DockerHub
         if: github.event_name != 'pull_request'
