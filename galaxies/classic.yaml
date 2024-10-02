@@ -17,6 +17,9 @@ systems:
       starting_level: 1
       production_multiplier: 1.2 # Explicitly smaller than the production multipliers for the other structures
       production:
+        - crew: 0
+          metal: 0
+          water: 0
         - crew: 5
           metal: 6
           water: 7
@@ -26,17 +29,23 @@ systems:
         - crew: 5
           metal: 5
           water: 5
-          time: 100
+          time: 1
         # Cost for lvl 2
         - crew: 5
           metal: 5
           water: 5
-          time: 100
+          time: 1
+      storage_multiplier: 1.1
+      storage:
+        - crew: 1000
+          metal: 1000
+          water: 1000
     hatchery:
       description: "The hatchery is where you can produce crew members. The more crew members you have, the more you can do."
       starting_level: 0
       production_multiplier: 1.25
       production:
+        - crew: 0
         - crew: 5
       cost_multiplier: 1.25
       cost:
@@ -48,6 +57,7 @@ systems:
       description: "Mine the astroid fields for precious and not so precious metals."
       starting_level: 0
       production:
+        - metal: 0
         - metal: 6
       cost_multiplier: 1.25
       production_multiplier: 1.25
@@ -59,6 +69,7 @@ systems:
     waterharvester:
       description: "Operate water harvesters to collect water from comets and frozen worlds."
       production:
+        - water: 0
         - water: 7
       cost_multiplier: 1.25
       production_multiplier: 1.25
@@ -67,3 +78,20 @@ systems:
           water: 10
           crew: 10
           time: 100
+    storagedepot:
+      description: "All your water, metal, and crew need to go somewhere."
+      cost_multiplier: 1.25
+      cost:
+        - metal: 10
+          water: 10
+          crew: 10
+          time: 100
+      storage_multiplier: 1.25
+      storage:
+        - crew: 0
+          metal: 0
+          water: 0
+        - crew: 1000
+          metal: 1000
+          water: 1000
+

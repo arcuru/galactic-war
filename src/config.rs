@@ -43,6 +43,11 @@ pub struct ProductionConfig {
     pub water: Option<usize>,
 }
 
+/// Storage Configuration.
+///
+/// Stores resource limit for storage.
+pub type StorageConfig = ProductionConfig;
+
 #[derive(Debug, Default, Deserialize)]
 pub struct StructureConfig {
     /// Description of the structure.
@@ -62,6 +67,12 @@ pub struct StructureConfig {
     /// The highest given production value will be multiplied by this value.
     pub production_multiplier: Option<f64>,
 
+    /// The amount of storage available at the starting level.
+    pub storage: Option<Vec<StorageConfig>>,
+
+    /// Used as a multiplier for the storage.
+    pub storage_multiplier: Option<f64>,
+
     /// Cost for each level
     /// They are the costs to level up from the current level to the next level
     /// The first element is the cost to level up from 0 to 1
@@ -79,8 +90,16 @@ impl GalaxyConfig {
         if let Some(structure) = self.systems.structures.get(&structure.to_lowercase()) {
             structure.get_production(level)
         } else {
-            println!("No production found for {}", structure);
             ProductionConfig::default()
+        }
+    }
+
+    /// Get the storage for a single structure at a given level.
+    pub fn get_structure_storage(&self, structure: &str, level: usize) -> StorageConfig {
+        if let Some(structure) = self.systems.structures.get(&structure.to_lowercase()) {
+            structure.get_storage(level)
+        } else {
+            StorageConfig::default()
         }
     }
 }
@@ -123,7 +142,7 @@ impl StructureConfig {
             if index < production.len() {
                 production[index].clone()
             } else if let Some(multiplier) = self.production_multiplier {
-                // Get the last entry in the production vector and it's index
+                // Get the last entry in the production vector and its index
                 let (last_level, last_production) = production.iter().enumerate().last().unwrap();
                 let exponent = index - last_level;
                 let multiplier = multiplier.powi(exponent as i32);
@@ -143,6 +162,41 @@ impl StructureConfig {
             }
         } else {
             ProductionConfig::default()
+        }
+    }
+
+    /// Get the storage for this structure at a given level.
+    pub fn get_storage(&self, level: usize) -> StorageConfig {
+        // Adjust for the starting level
+        let index = if let Some(lvl) = self.starting_level {
+            level - lvl
+        } else {
+            level
+        };
+        if let Some(storage) = &self.storage {
+            if index < storage.len() {
+                storage[index].clone()
+            } else if let Some(multiplier) = self.storage_multiplier {
+                // Get the last entry in the storage vector and its index
+                let (last_level, last_storage) = storage.iter().enumerate().last().unwrap();
+                let exponent = index - last_level;
+                let multiplier = multiplier.powi(exponent as i32);
+                let mut storage = last_storage.clone();
+                if let Some(metal) = storage.metal {
+                    storage.metal = Some((metal as f64 * multiplier) as usize);
+                }
+                if let Some(crew) = storage.crew {
+                    storage.crew = Some((crew as f64 * multiplier) as usize);
+                }
+                if let Some(water) = storage.water {
+                    storage.water = Some((water as f64 * multiplier) as usize);
+                }
+                storage.clone()
+            } else {
+                panic!("No storage found for level {}", level);
+            }
+        } else {
+            StorageConfig::default()
         }
     }
 }

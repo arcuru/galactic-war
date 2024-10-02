@@ -48,6 +48,7 @@ pub enum StructureType {
     AsteroidMine,
     WaterHarvester,
     Hatchery,
+    StorageDepot,
 }
 
 impl fmt::Display for StructureType {
@@ -65,6 +66,7 @@ impl FromStr for StructureType {
             "asteroidmine" => Ok(StructureType::AsteroidMine),
             "waterharvester" => Ok(StructureType::WaterHarvester),
             "hatchery" => Ok(StructureType::Hatchery),
+            "storagedepot" => Ok(StructureType::StorageDepot),
             _ => Err(()),
         }
     }
@@ -178,6 +180,30 @@ impl System {
         production
     }
 
+    /// Get the available resource storage in the system.
+    fn get_storage(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> SystemProduction {
+        self.process_events(tick, galaxy_config);
+        let mut production = SystemProduction {
+            metal: 0,
+            crew: 0,
+            water: 0,
+        };
+        for structure in self.structures.iter() {
+            let production_config =
+                galaxy_config.get_structure_storage(&structure.name.to_string(), structure.level);
+            if let Some(metal) = production_config.metal {
+                production.metal += metal;
+            }
+            if let Some(crew) = production_config.crew {
+                production.crew += crew;
+            }
+            if let Some(water) = production_config.water {
+                production.water += water;
+            }
+        }
+        production
+    }
+
     /// Callback for events
     ///
     /// This will process the event and update the state of the system.
@@ -190,6 +216,12 @@ impl System {
         match event.action {
             EventCallback::Metal => {
                 self.resources.metal += 1;
+                println!("Metal: {}", self.resources.metal);
+                let storage = self.get_storage(tick, galaxy_config);
+                if self.resources.metal > storage.metal {
+                    self.resources.metal = storage.metal;
+                }
+                println!("Metal: {}", self.resources.metal);
                 let production = self.get_production(tick, galaxy_config);
                 if production.metal > 0 {
                     // Create a new event for the next metal piece
@@ -202,6 +234,10 @@ impl System {
             }
             EventCallback::Water => {
                 self.resources.water += 1;
+                let storage = self.get_storage(tick, galaxy_config);
+                if self.resources.water > storage.water {
+                    self.resources.water = storage.water;
+                }
                 let production = self.get_production(tick, galaxy_config);
                 if production.water > 0 {
                     // Create a new event for the next water unit
@@ -214,7 +250,10 @@ impl System {
             }
             EventCallback::Crew => {
                 self.resources.crew += 1;
-                // Create a new event for the next crew member
+                let storage = self.get_storage(tick, galaxy_config);
+                if self.resources.crew > storage.crew {
+                    self.resources.crew = storage.crew;
+                }
                 let production = self.get_production(tick, galaxy_config);
                 if production.crew > 0 {
                     // Create a new event for the next crew member
