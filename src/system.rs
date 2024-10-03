@@ -216,12 +216,10 @@ impl System {
         match event.action {
             EventCallback::Metal => {
                 self.resources.metal += 1;
-                println!("Metal: {}", self.resources.metal);
                 let storage = self.get_storage(tick, galaxy_config);
                 if self.resources.metal > storage.metal {
                     self.resources.metal = storage.metal;
                 }
-                println!("Metal: {}", self.resources.metal);
                 let production = self.get_production(tick, galaxy_config);
                 if production.metal > 0 {
                     // Create a new event for the next metal piece
