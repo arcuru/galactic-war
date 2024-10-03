@@ -2,4 +2,6 @@
 
 A casual game of Galactic Conquest.
 
-Inspired by Inselkampf.
+Status: Pre-pre-alpha
+
+Inspired by [Inselkampf](https:///ik-seite.de)
