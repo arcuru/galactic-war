@@ -34,7 +34,7 @@ pub struct Event {
 
 pub type EventInfo = Event;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EventCallback {
     Metal,
     Water,
@@ -267,6 +267,7 @@ impl System {
                 if let Some(structure) = event.structure {
                     let index = self.structure(structure).unwrap();
                     self.structures[index].level += 1;
+                    self.update_events(tick, galaxy_config);
                 } else {
                     panic!("Structure event without StructureType");
                 }
@@ -314,19 +315,92 @@ impl System {
 
     /// Process all events that are expected to happen
     pub fn process_events(&mut self, tick: usize, galaxy_config: &GalaxyConfig) {
-        let mut dirty = true;
-        while dirty && self.event_to_process(tick) {
-            dirty = false;
+        while self.event_to_process(tick) {
             let events = self.events.clone();
             self.events.clear();
             for event in events.iter() {
                 if event.completion <= tick {
-                    dirty = true;
                     self.event_callback(tick, galaxy_config, event.clone());
                 } else {
                     self.register_event(event.clone());
                 }
             }
+        }
+    }
+
+    /// Updates pending events based on the current system state
+    ///
+    /// It's possible, as in the case of Building new structures, that the ETAs for
+    /// events need to be updated. This updates events so their ETA is the minimum of the
+    /// current ETA and the ETA with the new system state.
+    pub fn update_events(&mut self, tick: usize, galaxy_config: &GalaxyConfig) {
+        let production = self.get_production(tick, galaxy_config);
+        let events = self.events.clone();
+        self.events.clear();
+        for event in events.iter() {
+            match event.action {
+                EventCallback::Metal => {
+                    let new_completion = tick + (3600 / production.metal);
+                    if new_completion < event.completion {
+                        self.register_event(Event {
+                            completion: new_completion,
+                            action: EventCallback::Metal,
+                            structure: event.structure,
+                        });
+                    } else {
+                        self.register_event(event.clone());
+                    }
+                }
+                EventCallback::Water => {
+                    let new_completion = tick + (3600 / production.water);
+                    if new_completion < event.completion {
+                        self.register_event(Event {
+                            completion: new_completion,
+                            action: EventCallback::Water,
+                            structure: event.structure,
+                        });
+                    } else {
+                        self.register_event(event.clone());
+                    }
+                }
+                EventCallback::Crew => {
+                    let new_completion = tick + (3600 / production.crew);
+                    if new_completion < event.completion {
+                        self.register_event(Event {
+                            completion: new_completion,
+                            action: EventCallback::Crew,
+                            structure: event.structure,
+                        });
+                    } else {
+                        self.register_event(event.clone());
+                    }
+                }
+                _ => {
+                    self.register_event(event.clone());
+                }
+            }
+        }
+        // If production was 0, we may not have had an event to update so we'll need to add one
+        if production.metal > 0 && !self.events.iter().any(|e| e.action == EventCallback::Metal) {
+            self.register_event(Event {
+                completion: tick + (3600 / production.metal),
+                action: EventCallback::Metal,
+                structure: None,
+            });
+        }
+        if production.water > 0 && !self.events.iter().any(|e| e.action == EventCallback::Water) {
+            self.register_event(Event {
+                completion: tick + (3600 / production.water),
+                action: EventCallback::Water,
+                structure: None,
+            });
+        }
+        if production.crew > 0 && !self.events.iter().any(|e| e.action == EventCallback::Crew) {
+            self.register_event(Event {
+                completion: tick + (3600 / production.crew),
+                action: EventCallback::Crew,
+                structure: None,
+            });
         }
     }
 
