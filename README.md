@@ -2,9 +2,9 @@
 
 A casual game of Galactic Conquest.
 
-Status: Pre-pre-alpha.
+Status: Pre-pre-alpha. Test version on [test.galactic-war.com](https://test.galactic-war.com).
 
-Inspired by [Inselkampf](https:///ik-seite.de)
+Inspired by [Inselkampf](https://ik-seite.de/en/index.php)
 
 ## Repository
 
