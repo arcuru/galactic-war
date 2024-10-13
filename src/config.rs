@@ -4,6 +4,8 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use crate::Cost;
+
 /// Configuration for the Galaxy
 #[derive(Debug, Deserialize, Default)]
 pub struct GalaxyConfig {
@@ -106,7 +108,7 @@ impl GalaxyConfig {
 
 impl StructureConfig {
     /// Get the cost to build this structure at a given level
-    pub fn get_cost(&self, level: usize) -> HashMap<String, usize> {
+    pub fn get_cost(&self, level: usize) -> Cost {
         // Adjust for the starting level
         let index = if let Some(lvl) = self.starting_level {
             level - lvl
@@ -114,7 +116,7 @@ impl StructureConfig {
             level
         };
         if index < self.cost.len() {
-            self.cost[index].clone()
+            Cost::from_map(&self.cost[index])
         } else if let Some(multiplier) = self.cost_multiplier {
             // Get the last entry in the cost vector and it's index
             let (last_level, last_cost) = self.cost.iter().enumerate().last().unwrap();
@@ -124,7 +126,7 @@ impl StructureConfig {
             for (_, value) in cost.iter_mut() {
                 *value = (*value as f64 * multiplier) as usize;
             }
-            cost
+            Cost::from_map(&cost)
         } else {
             panic!("No cost found for level {}", level);
         }

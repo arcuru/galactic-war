@@ -2,7 +2,7 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::config::{GalaxyConfig, StructureConfig, SystemConfig};
-use crate::{Cost, Details, Resources, StructureInfo, SystemInfo, SystemProduction};
+use crate::{Details, Resources, StructureInfo, SystemInfo, SystemProduction};
 use std::fmt;
 use std::str::FromStr;
 
@@ -414,24 +414,8 @@ impl System {
                 for structure in self.structures.iter() {
                     builds.insert(
                         structure.name,
-                        Cost {
-                            metal: *System::get_structure_config(galaxy_config, structure.name)
-                                .cost[structure.level]
-                                .get("metal")
-                                .unwrap_or(&0),
-                            water: *System::get_structure_config(galaxy_config, structure.name)
-                                .cost[structure.level]
-                                .get("water")
-                                .unwrap_or(&0),
-                            crew: *System::get_structure_config(galaxy_config, structure.name).cost
-                                [structure.level]
-                                .get("crew")
-                                .unwrap_or(&0),
-                            ticks: *System::get_structure_config(galaxy_config, structure.name)
-                                .cost[structure.level]
-                                .get("time")
-                                .unwrap_or(&0),
-                        },
+                        System::get_structure_config(galaxy_config, structure.name)
+                            .get_cost(structure.level),
                     );
                 }
             }

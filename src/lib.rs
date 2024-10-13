@@ -103,6 +103,20 @@ pub struct Cost {
     pub ticks: usize,
 }
 
+impl Cost {
+    /// Create a Cost from a HashMap
+    ///
+    /// This converts the format seen in the config files to an actual Cost struct
+    pub fn from_map(cost: &HashMap<String, usize>) -> Cost {
+        Cost {
+            metal: *cost.get("metal").unwrap_or(&0),
+            water: *cost.get("water").unwrap_or(&0),
+            crew: *cost.get("crew").unwrap_or(&0),
+            ticks: *cost.get("ticks").unwrap_or(&0),
+        }
+    }
+}
+
 /// Info for a specific structure
 ///
 /// Lots of details are optional, as they don't all apply to all structures
