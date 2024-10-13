@@ -356,22 +356,22 @@ impl System {
         }
         if self.structure(structure).is_some() {
             // Verify if the structure can be built
-            let cost = &System::get_structure_config(galaxy_config, structure).cost
-                [self.structure_level(structure)];
-            if self.resources.metal >= *cost.get("metal").unwrap_or(&0)
-                && self.resources.water >= *cost.get("water").unwrap_or(&0)
-                && self.resources.crew >= *cost.get("crew").unwrap_or(&0)
+            let cost = &System::get_structure_config(galaxy_config, structure)
+                .get_cost(self.structure_level(structure));
+            if self.resources.metal >= cost.metal
+                && self.resources.water >= cost.water
+                && self.resources.crew >= cost.crew
             {
                 // Deduct the cost
                 self.resources = self.resources.clone()
                     - Resources {
-                        metal: *cost.get("metal").unwrap_or(&0),
-                        water: *cost.get("water").unwrap_or(&0),
-                        crew: *cost.get("crew").unwrap_or(&0),
+                        metal: cost.metal,
+                        water: cost.water,
+                        crew: cost.crew,
                     };
                 // Increase the level
                 let event = Event {
-                    completion: tick + cost.get("time").unwrap_or(&1),
+                    completion: tick + cost.ticks,
                     action: EventCallback::Build,
                     structure: Some(structure),
                 };
