@@ -13,7 +13,18 @@ tasks:
     desc: Run CI locally
     aliases: [ci]
     deps:
-      [audit, doc, fmt, test, nix:check, nix:build, clippy, pre-commit, build]
+      [
+        audit,
+        doc,
+        fmt,
+        test,
+        nix:check,
+        nix:build,
+        clippy,
+        pre-commit,
+        build,
+        build:docker,
+      ]
   nix:check:
     desc: Run Nix CI checks
     sources:
@@ -66,3 +77,10 @@ tasks:
     desc: Run the binary
     aliases: [r]
     cmd: cargo run
+  build:docker:
+    desc: Build the docker image
+    cmd: docker build -t galactic-war .
+  run:docker:
+    desc: Run the docker image
+    cmd: docker run --rm -p 3050:3050 --name galactic-war galactic-war:latest
+    deps: [build:docker]
