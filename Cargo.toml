@@ -1,17 +1,23 @@
 [package]
 name = "galactic-war"
 version = "0.1.0"
-edition = "2021"
 description = "A casual game of Galactic War"
+authors = ["Patrick Jackson <patrick@jackson.dev>"]
+edition = "2021"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/arcuru/galactic-war"
+homepage = "https://galactic-war.com"
+categories =["games"]
 
 [dependencies]
+axum = { version = "0.7", optional = true }
+indexmap = { version = "2", features = ["serde"]}
+lazy_static = { version = "1", optional = true }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = { version = "0.9", optional = true }
-axum = { version = "0.7", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
-lazy_static = { version = "1", optional = true }
-indexmap = { version = "2", features = ["serde"]}
 
 [features]
 default = ["bin"]
