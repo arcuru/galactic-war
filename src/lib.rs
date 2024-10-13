@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use rand::Rng;
 use std::collections::HashMap;
 use system::EventInfo;
@@ -86,7 +87,7 @@ pub struct SystemInfo {
     pub production: SystemProduction,
 
     /// Structure levels
-    pub structures: HashMap<StructureType, usize>,
+    pub structures: IndexMap<StructureType, usize>,
 
     /// Events in flight
     ///
@@ -122,9 +123,12 @@ impl Cost {
 /// Lots of details are optional, as they don't all apply to all structures
 #[derive(Clone, Debug, Default)]
 pub struct StructureInfo {
+    /// Level of the structure.
     pub level: usize,
+    /// Production of the structure, if any.
     pub production: Option<SystemProduction>,
-    pub builds: Option<HashMap<StructureType, Cost>>,
+    /// Things that this structure can build, if any.
+    pub builds: Option<IndexMap<StructureType, Cost>>,
 }
 
 /// Info to use in return values

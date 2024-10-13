@@ -1,5 +1,5 @@
 use core::panic;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use crate::config::{GalaxyConfig, StructureConfig, SystemConfig};
 use crate::{Details, Resources, StructureInfo, SystemInfo, SystemProduction};
@@ -408,7 +408,7 @@ impl System {
             };
             if structure == StructureType::Colony {
                 if details.builds.is_none() {
-                    details.builds = Some(HashMap::new());
+                    details.builds = Some(IndexMap::new());
                 }
                 let builds = details.builds.as_mut().unwrap();
                 for structure in self.structures.iter() {
@@ -424,7 +424,7 @@ impl System {
             let mut details = SystemInfo {
                 score: self.score(tick, galaxy_config),
                 resources: self.resources.clone(),
-                structures: HashMap::new(),
+                structures: IndexMap::new(),
                 production: self.get_production(tick, galaxy_config),
                 events: self.events.clone(),
             };

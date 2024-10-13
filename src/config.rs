@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 /// Contains all the config structs
 ///
 /// This is everything used externally to configure the galaxy
@@ -29,7 +30,7 @@ pub struct GalaxySize {
 #[derive(Debug, Default, Deserialize)]
 pub struct SystemConfig {
     /// List of structures that will be built on the system
-    pub structures: HashMap<String, StructureConfig>,
+    pub structures: IndexMap<String, StructureConfig>,
 
     /// Starting resources for the system
     pub resources: HashMap<String, usize>,
