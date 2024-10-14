@@ -27,8 +27,6 @@ tasks:
       ]
   nix:check:
     desc: Run Nix CI checks
-    sources:
-      - ./**/*
     cmds:
       - nix flake check
   nix:build:
@@ -37,41 +35,28 @@ tasks:
       - nix build
   clippy:
     desc: Run clippy
-    sources:
-      - ./**/*.rs
     cmd: cargo clippy
   pre-commit:
     desc: Run pre-commit
     cmd: pre-commit run --all-files --show-diff-on-failure
   fmt:
     desc: Run all formatters
-    sources:
-      - ./**/*.rs
-      - ./**/*.nix
     cmds:
       - cargo fmt --all
       - alejandra .
   test:
     desc: Run all tests
     aliases: [t]
-    sources:
-      - ./**/*.rs
     cmd: cargo nextest run
   doc:
     desc: Build the documentation
     cmd: cargo doc
   audit:
     desc: Run cargo security audit
-    sources:
-      - Cargo.lock
-      - flake.lock
     cmd: cargo audit
   build:
     desc: Build the project
     aliases: [b]
-    sources:
-      - ./**/*.rs
-      - ./Cargo*
     cmd: cargo build
   run:
     desc: Run the binary
