@@ -157,7 +157,7 @@ async fn system_build(
     for (structure, cost) in structure_costs.iter() {
         let level = system_info.structures.get(structure).unwrap_or(&0);
         page.add(&format!(
-            "<tr><td bgcolor=dddddd>🛖 
+            "<tr><td bgcolor=dddddd>🛖
             <a href=/{}/{}/{}/{}>{} (level {})</a>",
             galaxy,
             x,
@@ -259,19 +259,16 @@ async fn structure_get(
                         ));
                     }
                     let production = structure_config.get_production(dets.level);
-                    if production.metal.is_some()
-                        || production.crew.is_some()
-                        || production.water.is_some()
-                    {
+                    if production.metal > 0 || production.crew > 0 || production.water > 0 {
                         page.add("<h3>Produces:</h3><b>");
-                        if let Some(metal) = production.metal {
-                            page.add(&format!("💰 Metal: {} per hour<br>", metal));
+                        if production.metal > 0 {
+                            page.add(&format!("💰 Metal: {} per hour<br>", production.metal));
                         }
-                        if let Some(crew) = production.crew {
-                            page.add(&format!("🧑 Crew: {} per hour<br>", crew));
+                        if production.crew > 0 {
+                            page.add(&format!("🧑 Crew: {} per hour<br>", production.crew));
                         }
-                        if let Some(water) = production.water {
-                            page.add(&format!("💧 Water: {} per hour<br>", water));
+                        if production.water > 0 {
+                            page.add(&format!("💧 Water: {} per hour<br>", production.water));
                         }
                         page.add("</b>");
                     }

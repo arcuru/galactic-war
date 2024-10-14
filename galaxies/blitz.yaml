@@ -1,6 +1,6 @@
 # Settings for a blitz game of Galactic War
 #
-# This config is used (for now) for development, but it intended for use in a blitz game.
+# This config is used (for now) for development, but is intended for use in a blitz game.
 
 system_count: 200
 size:
@@ -8,89 +8,67 @@ size:
   y: 100
 systems:
   resources:
-    crew: 1000200
-    metal: 1000225
-    water: 1000250
+    crew: 200
+    metal: 225
+    water: 250
   structures:
     colony:
       description: "The colony is the heart of your empire. It is where you can build and upgrade structures. Upgrading your colony will allow you to build more structures."
       starting_level: 1
-      production_multiplier: 1.2 # Explicitly smaller than the production multipliers for the other structures
+      multiplier: 1.1 # Intentionally smaller than others, to encourage building the other things but let the colony be the base production
       production:
-        - crew: 0
-          metal: 0
-          water: 0
-        - crew: 5
-          metal: 6
-          water: 7
-      cost_multiplier: 1.25
+        crew: 5
+        metal: 6
+        water: 7
       cost:
-        # The first level must be defined but is never used, because of the starting level
-        - crew: 5
-          metal: 5
-          water: 5
-          time: 1
-        # Cost for lvl 2
-        - crew: 5
-          metal: 5
-          water: 5
-          time: 1
-      storage_multiplier: 1.1
+        multiplier: 1.25 # Same cost scaling as other structures
+        crew: 5
+        metal: 5
+        water: 5
+        time: 1
       storage:
-        - crew: 1000
-          metal: 1000
-          water: 1000
+        crew: 1000
+        metal: 1000
+        water: 1000
     hatchery:
       description: "The hatchery is where you can produce crew members. The more crew members you have, the more you can do."
-      starting_level: 0
-      production_multiplier: 1.25
+      multiplier: 1.25
       production:
-        - crew: 0
-        - crew: 50
-      cost_multiplier: 1.25
+        crew: 50
       cost:
-        - time: 100
-          crew: 50
-          metal: 60
-          water: 70
+        time: 100
+        crew: 50
+        metal: 60
+        water: 70
     asteroidmine:
       description: "Mine the astroid fields for precious and not so precious metals."
-      starting_level: 0
+      multiplier: 1.25
       production:
-        - metal: 0
-        - metal: 60
-      cost_multiplier: 1.25
-      production_multiplier: 1.25
+        metal: 60
       cost:
-        - metal: 10
-          water: 10
-          crew: 10
-          time: 100
+        metal: 10
+        water: 10
+        crew: 10
+        time: 100
     waterharvester:
       description: "Operate water harvesters to collect water from comets and frozen worlds."
+      multiplier: 1.25
       production:
-        - water: 0
-        - water: 70
-      cost_multiplier: 1.25
-      production_multiplier: 1.25
+        water: 70
       cost:
-        - metal: 10
-          water: 10
-          crew: 10
-          time: 100
+        metal: 10
+        water: 10
+        crew: 10
+        time: 100
     storagedepot:
       description: "All your water, metal, and crew need to go somewhere."
-      cost_multiplier: 1.25
+      multiplier: 1.25
       cost:
-        - metal: 10
-          water: 10
-          crew: 10
-          time: 100
-      storage_multiplier: 1.25
+        metal: 10
+        water: 10
+        crew: 10
+        time: 100
       storage:
-        - crew: 0
-          metal: 0
-          water: 0
-        - crew: 1000
-          metal: 1000
-          water: 1000
+        crew: 1000
+        metal: 1000
+        water: 1000

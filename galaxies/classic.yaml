@@ -17,9 +17,6 @@ systems:
       starting_level: 1
       production_multiplier: 1.2 # Explicitly smaller than the production multipliers for the other structures
       production:
-        - crew: 0
-          metal: 0
-          water: 0
         - crew: 5
           metal: 6
           water: 7

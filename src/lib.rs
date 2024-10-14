@@ -61,14 +61,14 @@ impl std::ops::Sub for Resources {
     }
 }
 
-impl std::ops::Mul<usize> for Resources {
+impl std::ops::Mul<f64> for Resources {
     type Output = Resources;
 
-    fn mul(self, other: usize) -> Resources {
+    fn mul(self, other: f64) -> Resources {
         Resources {
-            metal: self.metal * other,
-            crew: self.crew * other,
-            water: self.water * other,
+            metal: (self.metal as f64 * other).round() as usize,
+            crew: (self.crew as f64 * other).round() as usize,
+            water: (self.water as f64 * other).round() as usize,
         }
     }
 }
@@ -130,6 +130,17 @@ impl Cost {
                 crew: *cost.get("crew").unwrap_or(&0),
             },
             ticks: *cost.get("ticks").unwrap_or(&0),
+        }
+    }
+}
+
+impl std::ops::Mul<f64> for Cost {
+    type Output = Cost;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Cost {
+            resources: self.resources * rhs,
+            ticks: (self.ticks as f64 * rhs).round() as usize,
         }
     }
 }

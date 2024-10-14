@@ -2,7 +2,7 @@ use core::panic;
 use indexmap::IndexMap;
 
 use crate::config::{GalaxyConfig, StructureConfig, SystemConfig};
-use crate::{Details, Resources, StructureInfo, SystemInfo, SystemProduction};
+use crate::{Cost, Details, Resources, StructureInfo, SystemInfo, SystemProduction};
 use std::fmt;
 use std::str::FromStr;
 
@@ -86,7 +86,7 @@ impl System {
         for (name, structure) in system_config.structures.iter() {
             structures.push(Structure {
                 name: StructureType::from_str(name).unwrap(),
-                level: structure.starting_level.unwrap_or(0),
+                level: structure.starting_level,
             });
         }
         let mut new_system = Self {
@@ -167,15 +167,7 @@ impl System {
         for structure in self.structures.iter() {
             let production_config = galaxy_config
                 .get_structure_production(&structure.name.to_string(), structure.level);
-            if let Some(metal) = production_config.metal {
-                production.metal += metal;
-            }
-            if let Some(crew) = production_config.crew {
-                production.crew += crew;
-            }
-            if let Some(water) = production_config.water {
-                production.water += water;
-            }
+            production = production + production_config;
         }
         production
     }
@@ -183,25 +175,17 @@ impl System {
     /// Get the available resource storage in the system.
     fn get_storage(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> SystemProduction {
         self.process_events(tick, galaxy_config);
-        let mut production = SystemProduction {
+        let mut storage = Resources {
             metal: 0,
             crew: 0,
             water: 0,
         };
         for structure in self.structures.iter() {
-            let production_config =
+            let storage_config =
                 galaxy_config.get_structure_storage(&structure.name.to_string(), structure.level);
-            if let Some(metal) = production_config.metal {
-                production.metal += metal;
-            }
-            if let Some(crew) = production_config.crew {
-                production.crew += crew;
-            }
-            if let Some(water) = production_config.water {
-                production.water += water;
-            }
+            storage = storage + storage_config;
         }
-        production
+        storage
     }
 
     /// Callback for events
@@ -465,25 +449,19 @@ impl System {
                 .get_structure_production(&structure.to_string(), self.structure_level(structure));
             let mut details = StructureInfo {
                 level: self.structure_level(structure),
-                production: Some(Resources {
-                    metal: production_config.metal.unwrap_or(0),
-                    water: production_config.water.unwrap_or(0),
-                    crew: production_config.crew.unwrap_or(0),
-                }),
+                production: Some(production_config),
                 builds: None,
             };
             if structure == StructureType::Colony {
-                if details.builds.is_none() {
-                    details.builds = Some(IndexMap::new());
-                }
-                let builds = details.builds.as_mut().unwrap();
+                let mut builds: IndexMap<StructureType, Cost> = Default::default();
                 for structure in self.structures.iter() {
                     builds.insert(
                         structure.name,
                         System::get_structure_config(galaxy_config, structure.name)
-                            .get_cost(structure.level),
+                            .get_cost(structure.level + 1),
                     );
                 }
+                details.builds = Some(builds);
             }
             Ok(Details::Structure(details))
         } else {
