@@ -30,7 +30,7 @@ pub struct Galaxy {
 pub type SystemProduction = Resources;
 
 /// Resources in a system.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Resources {
     pub metal: usize,
     pub crew: usize,
@@ -73,6 +73,22 @@ impl std::ops::Mul<usize> for Resources {
     }
 }
 
+// Order is defined only if all the values are greater/less than the other.
+impl std::cmp::PartialOrd for Resources {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.metal > other.metal && self.crew > other.crew && self.water > other.water {
+            Some(std::cmp::Ordering::Greater)
+        } else if self.metal < other.metal && self.crew < other.crew && self.water < other.water {
+            Some(std::cmp::Ordering::Less)
+        } else if self.metal == other.metal && self.crew == other.crew && self.water == other.water
+        {
+            Some(std::cmp::Ordering::Equal)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct SystemInfo {
     /// Computed score of the system
@@ -98,9 +114,7 @@ pub struct SystemInfo {
 /// Struct to hold the cost for a build
 #[derive(Clone, Debug, Default)]
 pub struct Cost {
-    pub metal: usize,
-    pub water: usize,
-    pub crew: usize,
+    pub resources: Resources,
     pub ticks: usize,
 }
 
@@ -110,9 +124,11 @@ impl Cost {
     /// This converts the format seen in the config files to an actual Cost struct
     pub fn from_map(cost: &HashMap<String, usize>) -> Cost {
         Cost {
-            metal: *cost.get("metal").unwrap_or(&0),
-            water: *cost.get("water").unwrap_or(&0),
-            crew: *cost.get("crew").unwrap_or(&0),
+            resources: Resources {
+                metal: *cost.get("metal").unwrap_or(&0),
+                water: *cost.get("water").unwrap_or(&0),
+                crew: *cost.get("crew").unwrap_or(&0),
+            },
             ticks: *cost.get("ticks").unwrap_or(&0),
         }
     }

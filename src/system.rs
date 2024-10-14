@@ -293,7 +293,7 @@ impl System {
     /// Get the current resources of the system
     pub fn resources(&mut self, tick: usize, galaxy_config: &GalaxyConfig) -> Resources {
         self.process_events(tick, galaxy_config);
-        self.resources.clone()
+        self.resources
     }
 
     /// Check if there is an event that needs to be processed
@@ -432,18 +432,10 @@ impl System {
             // Verify if the structure can be built
             let cost = &System::get_structure_config(galaxy_config, structure)
                 .get_cost(self.structure_level(structure));
-            if self.resources.metal >= cost.metal
-                && self.resources.water >= cost.water
-                && self.resources.crew >= cost.crew
-            {
+            if self.resources >= cost.resources {
                 // Deduct the cost
-                self.resources = self.resources.clone()
-                    - Resources {
-                        metal: cost.metal,
-                        water: cost.water,
-                        crew: cost.crew,
-                    };
-                // Increase the level
+                self.resources = self.resources - cost.resources;
+                // Add a callback for the build completion
                 let event = Event {
                     completion: tick + cost.ticks,
                     action: EventCallback::Build,
@@ -497,7 +489,7 @@ impl System {
         } else {
             let mut details = SystemInfo {
                 score: self.score(tick, galaxy_config),
-                resources: self.resources.clone(),
+                resources: self.resources,
                 structures: IndexMap::new(),
                 production: self.get_production(tick, galaxy_config),
                 events: self.events.clone(),

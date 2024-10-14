@@ -169,23 +169,20 @@ async fn system_build(
 
         page.push_str(&format!(
             "<br>Cost: 💰{}/🧑{}/💧{}   Duration: {}</td>",
-            cost.metal,
-            cost.crew,
-            cost.water,
+            cost.resources.metal,
+            cost.resources.crew,
+            cost.resources.water,
             seconds_to_readable(cost.ticks)
         ));
 
-        if system_info.resources.metal >= cost.metal
-            && system_info.resources.crew >= cost.crew
-            && system_info.resources.water >= cost.water
-        {
+        if system_info.resources >= cost.resources {
             page.push_str(&format!(
                 "<td bgcolor=dddddd width=200><a href=/{}/{}/{}/build/{}>Upgrade to level {}</a></td></tr>",
                 galaxy, x, y, structure.to_string().to_lowercase(), level + 1));
         } else {
             // Figure out how long it will take to produce the missing resources at the current rate
             let metal_time = {
-                let metal = cost.metal as isize - system_info.resources.metal as isize;
+                let metal = cost.resources.metal as isize - system_info.resources.metal as isize;
                 if metal > 0 {
                     metal as usize * system_info.production.metal
                 } else {
@@ -193,7 +190,7 @@ async fn system_build(
                 }
             };
             let crew_time = {
-                let crew = cost.crew as isize - system_info.resources.crew as isize;
+                let crew = cost.resources.crew as isize - system_info.resources.crew as isize;
                 if crew > 0 {
                     crew as usize * system_info.production.crew
                 } else {
@@ -201,7 +198,7 @@ async fn system_build(
                 }
             };
             let water_time = {
-                let water = cost.water as isize - system_info.resources.water as isize;
+                let water = cost.resources.water as isize - system_info.resources.water as isize;
                 if water > 0 {
                     water as usize * system_info.production.water
                 } else {
