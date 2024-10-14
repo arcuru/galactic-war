@@ -415,7 +415,7 @@ impl System {
         if self.structure(structure).is_some() {
             // Verify if the structure can be built
             let cost = &System::get_structure_config(galaxy_config, structure)
-                .get_cost(self.structure_level(structure));
+                .get_cost(self.structure_level(structure) + 1);
             if self.resources >= cost.resources {
                 // Deduct the cost
                 self.resources = self.resources - cost.resources;
