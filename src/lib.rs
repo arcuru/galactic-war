@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use system::EventInfo;
 
 pub mod config;
@@ -34,6 +34,14 @@ pub struct Galaxy {
     ///
     /// This is used to ensure that events can only arrive in order
     tick: usize,
+
+    /// Track which systems have changed and need database persistence
+    #[cfg(feature = "db")]
+    dirty_systems: HashSet<Coords>,
+
+    /// Flag indicating if the galaxy needs to be persisted
+    #[cfg(feature = "db")]
+    needs_persist: bool,
 }
 
 /// Production of a system.
@@ -202,6 +210,10 @@ impl Galaxy {
             config,
             systems,
             tick: initial_tick,
+            #[cfg(feature = "db")]
+            dirty_systems: HashSet::new(),
+            #[cfg(feature = "db")]
+            needs_persist: false,
         }
     }
 
@@ -212,9 +224,19 @@ impl Galaxy {
         coords: Coords,
         structure: Option<StructureType>,
     ) -> Result<Details, String> {
+        let old_tick = self.tick;
         self.update_tick(tick)?;
+
         let system = self.systems.get_mut(&coords).unwrap();
-        system.get_details(tick, &self.config, structure)
+        let result = system.get_details(tick, &self.config, structure);
+
+        // Mark dirty if tick changed (indicates event processing occurred)
+        #[cfg(feature = "db")]
+        if self.tick != old_tick {
+            self.mark_system_dirty(coords);
+        }
+
+        result
     }
 
     /// Get a pointer to the Config
@@ -224,7 +246,9 @@ impl Galaxy {
 
     /// Return basic stats about the Galaxy
     pub fn stats(&mut self, tick: usize) -> Result<String, String> {
+        let old_tick = self.tick;
         self.update_tick(tick)?;
+
         let mut stats = format!("System count: {}\n", self.config.system_count);
         for (coords, system) in self.systems.iter_mut() {
             stats.push_str(&format!(
@@ -234,6 +258,16 @@ impl Galaxy {
                 system.metal(tick, &self.config),
             ));
         }
+
+        // Mark all systems dirty if tick changed
+        #[cfg(feature = "db")]
+        if self.tick != old_tick {
+            let coords: Vec<_> = self.systems.keys().cloned().collect();
+            for coord in coords {
+                self.mark_system_dirty(coord);
+            }
+        }
+
         Ok(stats)
     }
 
@@ -251,7 +285,15 @@ impl Galaxy {
     ) -> Result<Event, String> {
         self.update_tick(tick)?;
         let system = self.systems.get_mut(&coords).unwrap();
-        system.build(tick, &self.config, structure)
+        let result = system.build(tick, &self.config, structure);
+
+        // Mark for persistence on successful build
+        #[cfg(feature = "db")]
+        if result.is_ok() {
+            self.mark_system_dirty(coords);
+        }
+
+        result
     }
 
     /// Update the current tick, and verify we are not going back in time
@@ -261,6 +303,51 @@ impl Galaxy {
         }
         self.tick = tick;
         Ok(())
+    }
+
+    /// Change tracking methods (only available with db feature)
+    #[cfg(feature = "db")]
+    pub fn mark_system_dirty(&mut self, coords: Coords) {
+        self.dirty_systems.insert(coords);
+        self.needs_persist = true;
+    }
+
+    #[cfg(feature = "db")]
+    pub fn get_dirty_systems(&self) -> &HashSet<Coords> {
+        &self.dirty_systems
+    }
+
+    #[cfg(feature = "db")]
+    pub fn needs_persist(&self) -> bool {
+        self.needs_persist
+    }
+
+    #[cfg(feature = "db")]
+    pub fn clear_dirty_flag(&mut self) {
+        self.dirty_systems.clear();
+        self.needs_persist = false;
+    }
+
+    #[cfg(feature = "db")]
+    pub fn mark_all_dirty(&mut self) {
+        let coords: Vec<_> = self.systems.keys().cloned().collect();
+        for coord in coords {
+            self.dirty_systems.insert(coord);
+        }
+        self.needs_persist = true;
+    }
+
+    /// Replace the systems HashMap (used when loading from database)
+    #[cfg(feature = "db")]
+    pub fn replace_systems(&mut self, systems: HashMap<Coords, System>) {
+        self.systems = systems;
+        self.clear_dirty_flag();
+    }
+
+    /// Get the current tick for database operations
+    #[cfg(feature = "db")]
+    pub fn get_tick(&self) -> usize {
+        self.tick
     }
 }
 

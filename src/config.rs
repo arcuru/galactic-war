@@ -2,13 +2,13 @@ use indexmap::IndexMap;
 /// Contains all the config structs
 ///
 /// This is everything used externally to configure the galaxy
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::{Cost, Resources};
 
 /// Configuration for the Galaxy
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct GalaxyConfig {
     /// Static System Count
     pub system_count: usize,
@@ -20,14 +20,14 @@ pub struct GalaxyConfig {
     pub systems: SystemConfig,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct GalaxySize {
     pub x: usize,
     pub y: usize,
 }
 
 /// Configuration for the creation of an system
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct SystemConfig {
     /// List of structures that will be built on the system
     pub structures: IndexMap<String, StructureConfig>,
@@ -39,7 +39,7 @@ pub struct SystemConfig {
 /// Production Configuration.
 ///
 /// These are all in production per hour (3600 ticks).
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ProductionConfig {
     /// Used as a multiplier for the production.
     pub multiplier: Option<f64>,
@@ -60,7 +60,7 @@ pub struct ProductionConfig {
 /// Cost Configuration.
 ///
 /// These are the costs for building a lvl 1 structure and a multiplier for higher levels.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct CostConfig {
     /// Used as a multiplier for the production.
     pub multiplier: Option<f64>,
@@ -86,7 +86,7 @@ pub struct CostConfig {
 /// Stores resource limit for storage.
 pub type StorageConfig = ProductionConfig;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct StructureConfig {
     /// Description of the structure.
     pub description: Option<String>,

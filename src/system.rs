@@ -128,6 +128,39 @@ impl System {
         new_system
     }
 
+    /// Create a system from database data (only available with db feature)
+    #[cfg(feature = "db")]
+    pub fn from_database(
+        resources: Resources,
+        structures: Vec<(StructureType, usize)>,
+        events: Vec<Event>,
+    ) -> Self {
+        let structures = structures
+            .into_iter()
+            .map(|(name, level)| Structure { name, level })
+            .collect();
+        Self {
+            events,
+            resources,
+            structures,
+        }
+    }
+
+    /// Get system resources (for database persistence)
+    pub fn get_resources(&self) -> Resources {
+        self.resources
+    }
+
+    /// Get system structures as a list of (type, level) pairs (for database persistence)
+    pub fn get_structures(&self) -> Vec<(StructureType, usize)> {
+        self.structures.iter().map(|s| (s.name, s.level)).collect()
+    }
+
+    /// Get system events (for database persistence)
+    pub fn get_events(&self) -> &Vec<Event> {
+        &self.events
+    }
+
     /// Get the index of the structure by type
     ///
     /// The structure may not exist, so it returns an Option
