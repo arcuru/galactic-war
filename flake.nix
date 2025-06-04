@@ -161,6 +161,8 @@
           nodePackages.prettier
           statix
 
+          mdbook
+
           # Code coverage
           cargo-tarpaulin
         ];
