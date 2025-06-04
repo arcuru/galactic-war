@@ -23,6 +23,11 @@ Galactic War is designed as a modular, high-performance system built in Rust. Th
                 └─────────────────┬─────────────────┘
                                  │
                 ┌─────────────────▼─────────────────┐
+                │      Database Persistence         │
+                │       (SQLite/AppState)           │
+                └─────────────────┬─────────────────┘
+                                 │
+                ┌─────────────────▼─────────────────┐
                 │         Configuration             │
                 │        (YAML Files)               │
                 └───────────────────────────────────┘
@@ -48,6 +53,24 @@ The heart of the system is a pure Rust library that implements all game logic:
 - `GalaxyConfig` defines game rules and parameters
 - `StructureConfig` defines building properties
 - Fully customizable game mechanics
+
+### Database Persistence (`app.rs`, `persistence.rs`, `db/`)
+Real-time database persistence ensures data durability:
+
+**AppState Management**
+- Centralized application state with persistence lifecycle
+- Automatic loading of galaxies from database when accessed
+- Graceful degradation when database unavailable
+
+**Background Persistence**
+- Configurable auto-save intervals (default: 30 seconds)
+- Write coalescing to batch multiple changes
+- Dirty tracking to minimize database writes
+
+**SQLite Integration**
+- Complete schema for galaxies, systems, structures, and events
+- Transactional batching for consistency
+- Connection pooling for performance
 
 ### Binary Application (`main.rs`)
 The server binary provides network access to the game library:
@@ -144,12 +167,12 @@ docs/
 
 ## Future Architecture Plans
 
-### Database Integration
-Move from in-memory to persistent storage:
-- **SQLite** for single-server deployments
-- **PostgreSQL** for multi-server scaling
-- **Migration Tools** for data format upgrades
-- **Backup Systems** for data protection
+### Advanced Database Features
+Enhance the existing persistence system:
+- **PostgreSQL** for multi-server deployments and enhanced concurrency
+- **Data Analytics** for query performance optimization and usage insights
+- **Advanced Backup** with automated backups and point-in-time recovery
+- **Compression** for historical events and archived galaxy data
 
 ### Microservices Architecture
 Split components for better scaling:

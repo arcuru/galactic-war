@@ -7,7 +7,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// An System in the Galaxy
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct System {
     /// List of events that are happening in the system.
     events: Vec<Event>,
@@ -19,7 +19,7 @@ pub struct System {
     structures: Vec<Structure>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Structure {
     name: StructureType,
     level: usize,

@@ -1,15 +1,24 @@
 use indexmap::IndexMap;
 use rand::Rng;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use system::EventInfo;
 
+#[cfg(feature = "bin")]
+pub mod app;
 pub mod config;
 mod system;
+
+// Shared utilities (only available with 'bin' feature)
+#[cfg(feature = "bin")]
+pub mod utils;
+
 // Database and models modules
 #[cfg(feature = "db")]
 pub mod db;
 #[cfg(feature = "db")]
 pub mod models;
+#[cfg(feature = "db")]
+pub mod persistence;
 
 use crate::config::GalaxyConfig;
 use crate::system::System;
@@ -22,7 +31,7 @@ pub use crate::db::{Database, PersistenceError};
 #[cfg(feature = "db")]
 pub use crate::models::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Galaxy {
     /// Cached configuration for the galaxy
     config: GalaxyConfig,
@@ -37,7 +46,7 @@ pub struct Galaxy {
 
     /// Track which systems have changed and need database persistence
     #[cfg(feature = "db")]
-    dirty_systems: HashSet<Coords>,
+    dirty_systems: std::collections::HashSet<Coords>,
 
     /// Flag indicating if the galaxy needs to be persisted
     #[cfg(feature = "db")]
@@ -211,7 +220,7 @@ impl Galaxy {
             systems,
             tick: initial_tick,
             #[cfg(feature = "db")]
-            dirty_systems: HashSet::new(),
+            dirty_systems: std::collections::HashSet::new(),
             #[cfg(feature = "db")]
             needs_persist: false,
         }
@@ -224,7 +233,7 @@ impl Galaxy {
         coords: Coords,
         structure: Option<StructureType>,
     ) -> Result<Details, String> {
-        let old_tick = self.tick;
+        let _old_tick = self.tick;
         self.update_tick(tick)?;
 
         let system = self.systems.get_mut(&coords).unwrap();
@@ -232,7 +241,7 @@ impl Galaxy {
 
         // Mark dirty if tick changed (indicates event processing occurred)
         #[cfg(feature = "db")]
-        if self.tick != old_tick {
+        if self.tick != _old_tick {
             self.mark_system_dirty(coords);
         }
 
@@ -246,7 +255,7 @@ impl Galaxy {
 
     /// Return basic stats about the Galaxy
     pub fn stats(&mut self, tick: usize) -> Result<String, String> {
-        let old_tick = self.tick;
+        let _old_tick = self.tick;
         self.update_tick(tick)?;
 
         let mut stats = format!("System count: {}\n", self.config.system_count);
@@ -261,7 +270,7 @@ impl Galaxy {
 
         // Mark all systems dirty if tick changed
         #[cfg(feature = "db")]
-        if self.tick != old_tick {
+        if self.tick != _old_tick {
             let coords: Vec<_> = self.systems.keys().cloned().collect();
             for coord in coords {
                 self.mark_system_dirty(coord);
@@ -313,7 +322,7 @@ impl Galaxy {
     }
 
     #[cfg(feature = "db")]
-    pub fn get_dirty_systems(&self) -> &HashSet<Coords> {
+    pub fn get_dirty_systems(&self) -> &std::collections::HashSet<Coords> {
         &self.dirty_systems
     }
 

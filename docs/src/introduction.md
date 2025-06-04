@@ -17,6 +17,7 @@ Galactic War is a real-time strategy game where you build and manage solar syste
 
 **What's Working:**
 - Core galaxy simulation engine
+- Database persistence with auto-save functionality
 - Resource production and management
 - Structure building system
 - Configuration-based game worlds

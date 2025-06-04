@@ -16,14 +16,20 @@
 git clone https://github.com/arcuru/galactic-war.git
 cd galactic-war
 
-# Build the project
-cargo build
+# Build the project (with database features)
+cargo build --features bin,db
 
-# Run tests
-cargo test
+# Build without database features
+cargo build --features bin
 
-# Start the development server
-cargo run -- --config galaxies/classic.yaml
+# Run tests (including database tests)
+cargo test --features db
+
+# Start the development server with persistence
+cargo run --features bin,db
+
+# Start without persistence (in-memory only)
+cargo run --features bin
 ```
 
 ### Development Dependencies
@@ -33,6 +39,8 @@ The project uses several key Rust crates:
 - **tokio** - Async runtime
 - **serde_yaml** - YAML configuration parsing
 - **indexmap** - Ordered maps for consistent iteration
+- **sqlx** - Database access and migrations (optional, with 'db' feature)
+- **chrono** - Date and time handling for persistence
 
 ## Project Structure
 
@@ -64,6 +72,32 @@ Individual solar system logic:
 - Resource production
 - Construction handling
 
+### Database Persistence (`src/app.rs`, `src/persistence.rs`, `src/db/`, `src/models/`)
+Real-time database persistence system (optional, enabled with 'db' feature):
+
+**Application State Management (`src/app.rs`)**
+- `AppState` coordinates between in-memory state and database
+- Automatic galaxy loading from database when accessed
+- Background persistence with configurable intervals
+- Graceful degradation when database unavailable
+
+**Persistence Manager (`src/persistence.rs`)**
+- Background worker for periodic auto-saves
+- Write coalescing and batching optimization
+- Dirty tracking to minimize database writes
+- Shutdown handling with final saves
+
+**Database Layer (`src/db/`)**
+- Database connection and migration management
+- CRUD operations for galaxies, systems, structures, events
+- SQLite integration with connection pooling
+- Error handling and recovery
+
+**Data Models (`src/models/`)**
+- Database row structures for all entities
+- Type conversion between database (i64) and game (usize) types
+- Serialization support for complex game data
+
 ## Contributing Guidelines
 
 ### Code Style
@@ -85,6 +119,100 @@ When reporting bugs or suggesting features:
 - Include relevant configuration details
 - Describe expected vs. actual behavior
 - Add screenshots if applicable
+
+## Database Development
+
+### Working with Database Persistence
+
+**Environment Setup**
+```bash
+# Set database URL (optional, defaults to sqlite:galactic_war.db)
+export DATABASE_URL=sqlite:dev.db
+
+# Configure persistence settings
+export GALACTIC_WAR_AUTO_SAVE_INTERVAL=10  # Save every 10 seconds in dev
+export RUST_LOG=info                       # Enable persistence logging
+```
+
+**Feature Flags**
+- Use `--features db` to enable database functionality
+- The `bin` feature enables the HTTP server binary
+- Combine features: `--features bin,db` for full functionality
+
+**Database Migrations**
+```bash
+# Run with automatic migrations (default)
+cargo run --features bin,db
+
+# Check migration status
+cargo install sqlx-cli
+sqlx migrate info --database-url sqlite:galactic_war.db
+```
+
+**Development Database**
+```bash
+# Use separate database for development
+DATABASE_URL=sqlite:dev.db cargo run --features bin,db
+
+# Reset development database
+rm dev.db && cargo run --features bin,db
+```
+
+### Testing Database Features
+
+**Database Test Coverage**
+```bash
+# Run all database tests
+cargo test --features db db::
+
+# Run integration tests with AppState
+cargo test --features db app::tests
+
+# Run specific persistence tests
+cargo test --features db persistence::tests
+```
+
+**Test Database Isolation**
+- Tests use in-memory SQLite databases (`sqlite::memory:`)
+- Each test gets a fresh database instance
+- No cleanup required between tests
+
+**Adding Database Tests**
+```rust
+#[tokio::test]
+async fn test_my_feature() {
+    let db = Database::new_test().await;
+    // Your test logic here
+}
+```
+
+### Common Development Tasks
+
+**Adding New Database Fields**
+1. Update database models in `src/models/`
+2. Create migration file in `migrations/`
+3. Update CRUD operations in `src/db/`
+4. Add test coverage
+5. Update persistence logic if needed
+
+**Debugging Persistence Issues**
+```bash
+# Enable detailed persistence logging
+RUST_LOG=galactic_war::persistence=debug cargo run --features bin,db
+
+# Check database contents directly
+sqlite3 galactic_war.db ".tables"
+sqlite3 galactic_war.db "SELECT * FROM galaxies;"
+```
+
+**Performance Testing**
+```bash
+# Test with frequent saves
+GALACTIC_WAR_AUTO_SAVE_INTERVAL=1 cargo run --features bin,db
+
+# Monitor save performance
+RUST_LOG=galactic_war::persistence=info cargo run --features bin,db
+```
 
 ## Testing Strategy
 
@@ -182,7 +310,7 @@ websocket_send(SystemUpdate {
 ### Priority Features
 1. Fleet and combat system
 2. User authentication
-3. Database persistence
+3. Multi-galaxy management improvements
 4. Mobile optimization
 
 ### Technical Debt
@@ -193,7 +321,7 @@ websocket_send(SystemUpdate {
 
 ### Architecture Improvements
 - Microservices architecture for scaling
-- Database integration for persistence
+- Advanced database features (PostgreSQL, compression)
 - Caching layer for performance
 - Load balancing for high availability
 

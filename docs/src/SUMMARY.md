@@ -22,5 +22,6 @@
 # Technical
 
 - [Architecture](./technical/architecture.md)
+- [Database Persistence](./technical/persistence.md)
 - [API Reference](./technical/api.md)
 - [Development](./technical/development.md)

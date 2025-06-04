@@ -1,9 +1,14 @@
-use galactic_war::{Coords, Details, Galaxy, Resources, SystemInfo, SystemProduction};
+use crate::{Coords, Details, Galaxy, Resources, SystemInfo, SystemProduction};
 
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+#[cfg(feature = "bin")]
+use crate::app::AppState;
+#[cfg(feature = "bin")]
+use std::sync::Arc as StdArc;
 
 lazy_static::lazy_static! {
     // Safely share the galaxies between threads
@@ -20,8 +25,25 @@ pub fn tick() -> usize {
 }
 
 /// Retrieve the details of an system
-pub fn system_info(galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
-    let mut galaxies = GALAXIES.lock().unwrap();
+#[cfg(feature = "bin")]
+pub async fn system_info(
+    galaxy: &str,
+    coords: Coords,
+    app_state: &StdArc<AppState>,
+) -> Result<SystemInfo, String> {
+    let dets = app_state
+        .get_galaxy_details(galaxy, tick(), coords, None)
+        .await?;
+    match dets {
+        Details::System(info) => Ok(info),
+        _ => Err("Unexpected Details type".to_string()),
+    }
+}
+
+/// Retrieve the details of an system (synchronous version for web interface)
+#[cfg(feature = "bin")]
+pub fn system_info_sync(galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
+    let mut galaxies = (**GALAXIES).lock().unwrap();
     if let Some(galaxy) = galaxies.get_mut(galaxy) {
         let dets = galaxy.get_details(tick(), coords, None);
         if let Ok(dets) = dets {

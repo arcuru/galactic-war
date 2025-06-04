@@ -30,7 +30,7 @@ pub enum PersistenceError {
 
 /// Database connection manager
 #[cfg(feature = "db")]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Database {
     pool: Pool<Sqlite>,
 }

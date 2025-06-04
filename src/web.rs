@@ -4,9 +4,10 @@
 ///
 use axum::response::Html;
 
-use galactic_war::Coords;
-
-use crate::utils::*;
+use galactic_war::{
+    utils::{resource_table, system_info_sync},
+    Coords,
+};
 
 #[derive(Debug)]
 pub struct GalacticWeb {
@@ -85,7 +86,7 @@ impl GalacticWeb {
         .to_string();
         page.push_str(&self.get_linkback());
         page.push_str("<br><br>");
-        let system_info = system_info(&self.galaxy, self.coords)?;
+        let system_info = system_info_sync(&self.galaxy, self.coords)?;
         page.push_str(&resource_table(
             &system_info.resources,
             &system_info.production,
