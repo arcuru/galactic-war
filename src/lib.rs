@@ -5,10 +5,22 @@ use system::EventInfo;
 
 pub mod config;
 mod system;
+// Database and models modules
+#[cfg(feature = "db")]
+pub mod db;
+#[cfg(feature = "db")]
+pub mod models;
+
 use crate::config::GalaxyConfig;
 use crate::system::System;
 
 pub use crate::system::{Event, EventCallback, StructureType};
+
+// Re-export database types when db feature is enabled
+#[cfg(feature = "db")]
+pub use crate::db::{Database, PersistenceError};
+#[cfg(feature = "db")]
+pub use crate::models::*;
 
 #[derive(Debug)]
 pub struct Galaxy {

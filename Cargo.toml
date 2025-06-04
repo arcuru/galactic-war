@@ -8,20 +8,32 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/arcuru/galactic-war"
 homepage = "https://galactic-war.com"
-categories =["games"]
+categories = ["games"]
 
 [dependencies]
 axum = { version = "0.7", optional = true }
-indexmap = { version = "2", features = ["serde"]}
+indexmap = { version = "2", features = ["serde"] }
 lazy_static = { version = "1", optional = true }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = { version = "0.9", optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
 
+# Database persistence dependencies
+sqlx = { version = "0.7", features = [
+    "runtime-tokio-rustls",
+    "sqlite",
+    "chrono",
+    "migrate",
+], optional = true }
+chrono = { version = "0.4", features = ["serde"], optional = true }
+serde_json = { version = "1.0", optional = true }
+thiserror = { version = "1.0", optional = true }
+
 [features]
 default = ["bin"]
 bin = ["axum", "serde_yaml", "tokio", "lazy_static"]
+db = ["sqlx", "chrono", "serde_json", "thiserror"]
 
 [[bin]]
 name = "galactic-war"
