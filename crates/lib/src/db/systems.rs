@@ -13,9 +13,7 @@ impl Database {
         galaxy_name: &str,
         x: usize,
         y: usize,
-        metal: usize,
-        crew: usize,
-        water: usize,
+        resources: &crate::Resources,
         current_tick: usize,
     ) -> Result<i64, PersistenceError> {
         let result = sqlx::query(
@@ -34,9 +32,9 @@ impl Database {
         .bind(galaxy_name)
         .bind(x as i64)
         .bind(y as i64)
-        .bind(metal as i64)
-        .bind(crew as i64)
-        .bind(water as i64)
+        .bind(resources.metal as i64)
+        .bind(resources.crew as i64)
+        .bind(resources.water as i64)
         .bind(current_tick as i64)
         .fetch_one(&self.pool)
         .await?;
@@ -139,8 +137,9 @@ mod tests {
         let water = 300;
 
         // Test system creation
+        let resources = crate::Resources { metal, crew, water };
         let system_id = db
-            .save_system(galaxy_name, x, y, metal, crew, water, 0)
+            .save_system(galaxy_name, x, y, &resources, 0)
             .await
             .expect("Failed to save system");
 
@@ -168,12 +167,14 @@ mod tests {
         assert_eq!(systems[0].id, system_id);
 
         // Test system update (same coordinates, different resources)
-        let new_metal = 500;
-        let new_crew = 600;
-        let new_water = 700;
+        let new_resources = crate::Resources {
+            metal: 500,
+            crew: 600,
+            water: 700,
+        };
 
         let updated_system_id = db
-            .save_system(galaxy_name, x, y, new_metal, new_crew, new_water, 0)
+            .save_system(galaxy_name, x, y, &new_resources, 0)
             .await
             .expect("Failed to update system");
 
@@ -186,7 +187,10 @@ mod tests {
             .expect("Failed to get updated system")
             .expect("System should exist");
 
-        assert_eq!(updated_system.resources(), (new_metal, new_crew, new_water));
+        assert_eq!(
+            updated_system.resources(),
+            (new_resources.metal, new_resources.crew, new_resources.water)
+        );
 
         // Test system deletion
         db.delete_systems(galaxy_name)
@@ -220,7 +224,12 @@ mod tests {
         ];
 
         for (x, y, metal, crew, water) in &systems_data {
-            db.save_system(galaxy_name, *x, *y, *metal, *crew, *water, 0)
+            let resources = crate::Resources {
+                metal: *metal,
+                crew: *crew,
+                water: *water,
+            };
+            db.save_system(galaxy_name, *x, *y, &resources, 0)
                 .await
                 .expect("Failed to save system");
         }

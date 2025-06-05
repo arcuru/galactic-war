@@ -1,23 +1,21 @@
 use axum::response::Html;
 use galactic_war::{
-    app::AppState,
-    config::GalaxyConfig,
-    utils::{system_info, tick, GALAXIES},
-    Coords, Details, EventCallback, StructureType,
+    app::AppState, config::GalaxyConfig, tick, Coords, Details, EventCallback, StructureType,
 };
 
+use std::sync::Arc;
+
 mod web;
+
 use crate::web::GalacticWeb;
 
 use axum::{extract::Path, routing::get, Extension, Router};
 use std::cmp::max;
 use std::str::FromStr;
-use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
-    #[cfg(feature = "bin")]
     env_logger::init();
 
     log::info!("Starting Galactic War server...");
@@ -34,19 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(msg) => log::info!("{}", msg),
         Err(e) => log::error!("Failed to create initial galaxy: {}", e),
     }
-
-    // Setup graceful shutdown
-    let app_state_clone = app_state.clone();
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl-c");
-        log::info!("Received shutdown signal");
-        if let Err(e) = Arc::try_unwrap(app_state_clone).unwrap().shutdown().await {
-            log::error!("Error during shutdown: {}", e);
-        }
-        std::process::exit(0);
-    });
 
     serve(app_state).await
 }
@@ -135,21 +120,24 @@ async fn base_get(Extension(app_state): Extension<Arc<AppState>>) -> Html<String
 }
 
 /// Handler for GET requests to /:galaxy/create
+#[axum::debug_handler]
 async fn galaxy_create_get(
     Path(galaxy): Path<String>,
     Extension(app_state): Extension<Arc<AppState>>,
-) -> String {
+) -> Html<String> {
     // FIXME: Hardcoded galaxy config
     let contents = include_str!("../galaxies/blitz.yaml");
     let galaxy_config: GalaxyConfig = serde_yaml::from_str(contents).unwrap();
 
-    match app_state
+    let result = match app_state
         .create_galaxy(&galaxy, &galaxy_config, tick())
         .await
     {
         Ok(msg) => msg,
         Err(e) => e,
-    }
+    };
+
+    Html::from(result)
 }
 
 /// Handler for GET requests to /:galaxy/:x/:y/build/:structure
@@ -176,8 +164,8 @@ async fn system_build(
 ) -> Result<Html<String>, String> {
     let dets = structure_info(&galaxy, (x, y).into(), "Colony", &app_state).await;
 
-    let system_info = system_info(&galaxy, (x, y).into(), &app_state).await?;
-    let mut page = GalacticWeb::new(&galaxy, (x, y).into());
+    let system_info = app_state.system_info(&galaxy, (x, y).into()).await?;
+    let mut page = GalacticWeb::new(&galaxy, (x, y).into(), app_state.clone());
     page.add_linkback("Build", "build");
 
     // Push the table header
@@ -271,7 +259,7 @@ async fn structure_get(
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> Result<Html<String>, String> {
     let dets = structure_info(&galaxy, (x, y).into(), &structure, &app_state).await;
-    let mut page = GalacticWeb::new(&galaxy, (x, y).into());
+    let mut page = GalacticWeb::new(&galaxy, (x, y).into(), app_state.clone());
     page.add_linkback(&structure, &structure);
 
     if let Ok(dets) = dets {
@@ -282,9 +270,9 @@ async fn structure_get(
             }
         };
         {
-            let mut galaxies = GALAXIES.try_lock().unwrap();
-            if let Some(galaxy) = galaxies.get_mut(&galaxy) {
-                let config = galaxy.get_config();
+            let galaxies = app_state.galaxies().lock().unwrap();
+            if let Some(galaxy_obj) = galaxies.get(&galaxy) {
+                let config = galaxy_obj.get_config();
                 if let Some(structure_config) = config.systems.structures.get(&structure) {
                     if dets.level > 0 {
                         page.add(&format!("<h2>{} (level {})</h2>", structure, dets.level));
@@ -340,8 +328,8 @@ async fn system_get(
     Path((galaxy, x, y)): Path<(String, usize, usize)>,
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> Result<Html<String>, String> {
-    let system_info = system_info(&galaxy, (x, y).into(), &app_state).await?;
-    let mut page = GalacticWeb::new(&galaxy, (x, y).into());
+    let system_info = app_state.system_info(&galaxy, (x, y).into()).await?;
+    let mut page = GalacticWeb::new(&galaxy, (x, y).into(), app_state.clone());
 
     page.add("<br><table width=600 border=0 cellSpacing=1 cellPadding=3><tbody><tr><td vAlign=top width=50%><B>Structures</b><br><font color=#CCCCC><b>");
 
@@ -436,20 +424,33 @@ async fn galaxy_get(
 
 /// Returns all the visible info for the galaxy
 async fn galaxy_info(
-    galaxy: &str,
-    _app_state: &Arc<AppState>,
+    galaxy_name: &str,
+    app_state: &Arc<AppState>,
 ) -> Result<Vec<(Coords, Details)>, String> {
     let mut system_info = Vec::new();
-    let mut galaxies = GALAXIES.try_lock().unwrap();
-    if let Some(galaxy) = galaxies.get_mut(galaxy) {
-        let addresses = galaxy.systems().keys().cloned().collect::<Vec<_>>();
-        for addr in addresses {
-            system_info.push((addr, galaxy.get_details(tick(), addr, None).unwrap()));
+
+    // First, get all the addresses
+    let addresses = {
+        let galaxies = app_state.galaxies().lock().unwrap();
+        if let Some(galaxy) = galaxies.get(galaxy_name) {
+            galaxy.systems().keys().cloned().collect::<Vec<_>>()
+        } else {
+            return Err(format!("Galaxy '{}' not found", galaxy_name));
         }
-        Ok(system_info)
-    } else {
-        Err(format!("Galaxy '{}' not found", galaxy).to_string())
+    };
+
+    // Now get details for each address
+    for addr in addresses {
+        match app_state
+            .get_galaxy_details(galaxy_name, tick(), addr, None)
+            .await
+        {
+            Ok(details) => system_info.push((addr, details)),
+            Err(e) => return Err(e),
+        }
     }
+
+    Ok(system_info)
 }
 
 /// Convert seconds into a human readable format

@@ -1,6 +1,4 @@
-#[cfg(feature = "bin")]
-use crate::utils::GALAXIES;
-use crate::{config::GalaxyConfig, Coords, Details, Event, Galaxy};
+use crate::{config::GalaxyConfig, Coords, Details, Event, Galaxy, SystemInfo};
 
 #[cfg(feature = "db")]
 use crate::{
@@ -8,19 +6,25 @@ use crate::{
     persistence::{PersistenceConfig, PersistenceManager},
 };
 
+use std::collections::HashMap;
 #[cfg(feature = "db")]
 use std::env;
+use std::sync::{Arc, Mutex};
 
 /// Application state manager that coordinates between in-memory state and persistence
 #[derive(Debug)]
 pub struct AppState {
     #[cfg(feature = "db")]
     persistence_manager: Option<PersistenceManager>,
+    /// Galaxy storage
+    galaxies: Arc<Mutex<HashMap<String, Galaxy>>>,
 }
 
 impl AppState {
     /// Initialize the application state with optional persistence
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let galaxies = Arc::new(Mutex::new(HashMap::new()));
+
         #[cfg(feature = "db")]
         {
             // Check if persistence is enabled via environment variable
@@ -59,16 +63,20 @@ impl AppState {
                 log::info!("Persistence config: auto_save_interval={}s, write_coalescing={}, coalescing_delay={}ms", 
                     config.auto_save_interval, config.write_coalescing, config.coalescing_delay_ms);
 
-                // Create persistence manager
-                let persistence_manager = PersistenceManager::new(database, config).await?;
+                // Create persistence manager with weak reference to galaxies
+                let galaxies_weak = Arc::downgrade(&galaxies);
+                let persistence_manager =
+                    PersistenceManager::new(database, config, galaxies_weak).await?;
 
                 Ok(Self {
                     persistence_manager: Some(persistence_manager),
+                    galaxies,
                 })
             } else {
                 log::info!("Persistence disabled via configuration");
                 Ok(Self {
                     persistence_manager: None,
+                    galaxies,
                 })
             }
         }
@@ -76,7 +84,7 @@ impl AppState {
         #[cfg(not(feature = "db"))]
         {
             log::info!("Database persistence not available (compiled without 'db' feature)");
-            Ok(Self {})
+            Ok(Self { galaxies })
         }
     }
 
@@ -87,12 +95,15 @@ impl AppState {
         {
             Ok(Self {
                 persistence_manager: None,
+                galaxies: Arc::new(Mutex::new(HashMap::new())),
             })
         }
 
         #[cfg(not(feature = "db"))]
         {
-            Ok(Self {})
+            Ok(Self {
+                galaxies: Arc::new(Mutex::new(HashMap::new())),
+            })
         }
     }
 
@@ -104,11 +115,13 @@ impl AppState {
         initial_tick: usize,
     ) -> Result<String, String> {
         // Check if galaxy already exists in memory
-        {
-            let galaxies = (**GALAXIES).lock().unwrap();
-            if galaxies.contains_key(galaxy_name) {
-                return Err(format!("Galaxy {} already exists in memory", galaxy_name));
-            }
+        let galaxy_exists = {
+            let galaxies = self.galaxies.lock().unwrap();
+            galaxies.contains_key(galaxy_name)
+        };
+
+        if galaxy_exists {
+            return Err(format!("Galaxy {} already exists in memory", galaxy_name));
         }
 
         #[cfg(feature = "db")]
@@ -118,10 +131,14 @@ impl AppState {
                 Ok(true) => {
                     // Try to load from database
                     match pm.load_galaxy(galaxy_name).await {
-                        Ok(true) => {
-                            return Ok(format!("Galaxy {} loaded from database", galaxy_name))
+                        Ok(Some(galaxy)) => {
+                            {
+                                let mut galaxies = self.galaxies.lock().unwrap();
+                                galaxies.insert(galaxy_name.to_string(), galaxy);
+                            }
+                            return Ok(format!("Galaxy {} loaded from database", galaxy_name));
                         }
-                        Ok(false) => {
+                        Ok(None) => {
                             return Err(format!(
                                 "Galaxy {} exists in database but failed to load",
                                 galaxy_name
@@ -161,15 +178,22 @@ impl AppState {
         let galaxy = Galaxy::new(config.clone(), initial_tick);
 
         {
-            let mut galaxies = (**GALAXIES).lock().unwrap();
+            let mut galaxies = self.galaxies.lock().unwrap();
             galaxies.insert(galaxy_name.to_string(), galaxy);
         }
 
         #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
-            // Save initial state to database
-            if let Err(e) = pm.save_galaxy(galaxy_name).await {
-                log::error!("Failed to persist new galaxy {}: {}", galaxy_name, e);
+            // Save initial state to database - we need to clone the galaxy to avoid holding lock across await
+            let galaxy_clone = {
+                let galaxies = self.galaxies.lock().unwrap();
+                galaxies.get(galaxy_name).cloned()
+            };
+
+            if let Some(mut galaxy) = galaxy_clone {
+                if let Err(e) = pm.save_galaxy(galaxy_name, &mut galaxy).await {
+                    log::error!("Failed to persist new galaxy {}: {}", galaxy_name, e);
+                }
             }
         }
 
@@ -186,7 +210,7 @@ impl AppState {
     ) -> Result<Details, String> {
         // Try to get from memory first
         {
-            let mut galaxies = (**GALAXIES).lock().unwrap();
+            let mut galaxies = self.galaxies.lock().unwrap();
             if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
                 return galaxy.get_details(tick, coords, structure);
             }
@@ -196,19 +220,31 @@ impl AppState {
         if let Some(ref pm) = self.persistence_manager {
             // Try to load from database
             match pm.load_galaxy(galaxy_name).await {
-                Ok(true) => {
-                    // Now try again from memory
-                    let mut galaxies = (**GALAXIES).lock().unwrap();
+                Ok(Some(galaxy)) => {
+                    let mut galaxies = self.galaxies.lock().unwrap();
+                    galaxies.insert(galaxy_name.to_string(), galaxy);
+                    // Now try again to get the details
                     if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
-                        return galaxy.get_details(tick, coords, structure);
+                        galaxy.get_details(tick, coords, structure)
+                    } else {
+                        Err("Failed to insert loaded galaxy into memory".to_string())
                     }
                 }
-                Ok(false) => {}
-                Err(e) => log::error!("Error loading galaxy from database: {}", e),
+                Ok(None) => Err(format!("Galaxy '{}' not found in database", galaxy_name)),
+                Err(e) => Err(format!("Database error loading galaxy: {}", e)),
             }
+        } else {
+            Err(format!(
+                "Galaxy '{}' not found and persistence not available",
+                galaxy_name
+            ))
         }
 
-        Err(format!("Galaxy '{}' not found", galaxy_name))
+        #[cfg(not(feature = "db"))]
+        Err(format!(
+            "Galaxy '{}' not found and persistence not available",
+            galaxy_name
+        ))
     }
 
     /// Build a structure with auto-persistence
@@ -223,7 +259,7 @@ impl AppState {
         self.ensure_galaxy_loaded(galaxy_name).await?;
 
         let result = {
-            let mut galaxies = (**GALAXIES).lock().unwrap();
+            let mut galaxies = self.galaxies.lock().unwrap();
             if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
                 galaxy.build(tick, coords, structure)
             } else {
@@ -240,7 +276,7 @@ impl AppState {
         // Ensure galaxy is loaded
         self.ensure_galaxy_loaded(galaxy_name).await?;
 
-        let mut galaxies = (**GALAXIES).lock().unwrap();
+        let mut galaxies = self.galaxies.lock().unwrap();
         if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
             galaxy.stats(tick)
         } else {
@@ -252,7 +288,8 @@ impl AppState {
     pub async fn save_all(&self) -> Result<usize, String> {
         #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
-            match pm.save_all_dirty().await {
+            let mut galaxies = self.galaxies.lock().unwrap();
+            match pm.save_all_dirty(&mut galaxies).await {
                 Ok(count) => {
                     log::info!("Manually saved {} galaxies", count);
                     Ok(count)
@@ -273,7 +310,7 @@ impl AppState {
 
         // Get galaxies from memory
         {
-            let memory_galaxies = (**GALAXIES).lock().unwrap();
+            let memory_galaxies = self.galaxies.lock().unwrap();
             galaxies.extend(memory_galaxies.keys().cloned());
         }
 
@@ -292,7 +329,7 @@ impl AppState {
     async fn ensure_galaxy_loaded(&self, galaxy_name: &str) -> Result<(), String> {
         // Check if already in memory
         {
-            let galaxies = (**GALAXIES).lock().unwrap();
+            let galaxies = self.galaxies.lock().unwrap();
             if galaxies.contains_key(galaxy_name) {
                 return Ok(());
             }
@@ -300,33 +337,90 @@ impl AppState {
 
         #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
+            // Try to load from database
             match pm.load_galaxy(galaxy_name).await {
-                Ok(true) => Ok(()),
-                Ok(false) => Err(format!("Galaxy '{}' not found in database", galaxy_name)),
+                Ok(Some(galaxy)) => {
+                    let mut galaxies = self.galaxies.lock().unwrap();
+                    galaxies.insert(galaxy_name.to_string(), galaxy);
+                    Ok(())
+                }
+                Ok(None) => Err(format!("Galaxy '{}' not found in database", galaxy_name)),
                 Err(e) => Err(format!("Database error loading galaxy: {}", e)),
             }
         } else {
-            Err(format!(
-                "Galaxy '{}' not found and persistence not available",
-                galaxy_name
-            ))
+            Err(format!("Galaxy '{}' not found in memory", galaxy_name))
         }
 
         #[cfg(not(feature = "db"))]
-        Err(format!("Galaxy '{}' not found", galaxy_name))
+        Err(format!("Galaxy '{}' not found in memory", galaxy_name))
     }
 
     /// Gracefully shutdown the application
     pub async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        log::info!("Shutting down application...");
-
         #[cfg(feature = "db")]
-        if let Some(pm) = self.persistence_manager {
-            pm.shutdown().await?;
+        if let Some(persistence_manager) = self.persistence_manager {
+            log::info!("Shutting down persistence manager...");
+            persistence_manager.shutdown().await?;
         }
 
-        log::info!("Application shutdown complete");
+        #[cfg(not(feature = "db"))]
+        log::info!("No persistence to shut down");
+
         Ok(())
+    }
+
+    /// Gracefully shutdown without consuming self (for signal handlers)
+    pub async fn shutdown_gracefully(&self) -> Result<(), String> {
+        // Save all dirty galaxies first
+        self.save_all().await?;
+
+        #[cfg(feature = "db")]
+        if let Some(ref pm) = self.persistence_manager {
+            log::info!("Shutting down persistence manager...");
+            if let Err(e) = pm.shutdown().await {
+                log::error!("Error shutting down persistence manager: {}", e);
+                return Err(format!("Persistence shutdown error: {}", e));
+            }
+        }
+
+        #[cfg(not(feature = "db"))]
+        log::info!("No persistence to shut down");
+
+        Ok(())
+    }
+
+    /// Retrieve the details of a system (async version)
+    pub async fn system_info(&self, galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
+        let dets = self
+            .get_galaxy_details(galaxy, crate::tick(), coords, None)
+            .await?;
+        match dets {
+            Details::System(info) => Ok(info),
+            _ => Err("Unexpected Details type".to_string()),
+        }
+    }
+
+    /// Retrieve the details of a system (synchronous version for web interface)
+    pub fn system_info_sync(&self, galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
+        let mut galaxies = self.galaxies.lock().unwrap();
+        if let Some(galaxy) = galaxies.get_mut(galaxy) {
+            let dets = galaxy.get_details(crate::tick(), coords, None);
+            if let Ok(dets) = dets {
+                match dets {
+                    Details::System(info) => Ok(info),
+                    _ => Err("Unexpected Details type".to_string()),
+                }
+            } else {
+                Err(dets.unwrap_err())
+            }
+        } else {
+            Err("Galaxy not found".to_string())
+        }
+    }
+
+    /// Get direct access to galaxy storage for binary use (legacy compatibility)
+    pub fn galaxies(&self) -> &Arc<Mutex<HashMap<String, Galaxy>>> {
+        &self.galaxies
     }
 }
 
@@ -376,7 +470,7 @@ mod tests {
 
         // Get a valid coordinate by checking the galaxy's systems
         let coords = {
-            let galaxies = crate::utils::GALAXIES.lock().unwrap();
+            let galaxies = app_state.galaxies.lock().unwrap();
             let galaxy = galaxies.get("ops_test").unwrap();
             *galaxy.systems().keys().next().unwrap()
         };

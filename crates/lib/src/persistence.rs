@@ -1,8 +1,7 @@
-#[cfg(feature = "bin")]
-use crate::utils::GALAXIES;
-use std::collections::HashSet;
+use crate::Galaxy;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::time::interval;
 
@@ -43,6 +42,7 @@ pub struct PersistenceManager {
     database: Database,
     config: PersistenceConfig,
     shutdown_signal: Arc<AtomicBool>,
+    galaxies: Weak<Mutex<HashMap<String, Galaxy>>>,
     _shutdown_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -52,15 +52,18 @@ impl PersistenceManager {
     pub async fn new(
         database: Database,
         config: PersistenceConfig,
+        galaxies: Weak<Mutex<HashMap<String, Galaxy>>>,
     ) -> Result<Self, crate::db::PersistenceError> {
         let shutdown_signal = Arc::new(AtomicBool::new(false));
 
         // Start the background persistence worker
         let worker_handle = if config.enabled {
+            let worker_galaxies = galaxies.clone();
             tokio::spawn(Self::run_persistence_worker(
                 database.clone(),
                 config.clone(),
                 shutdown_signal.clone(),
+                worker_galaxies,
             ))
         } else {
             // If persistence is disabled, just spawn a dummy task
@@ -71,6 +74,7 @@ impl PersistenceManager {
             database,
             config,
             shutdown_signal,
+            galaxies,
             _shutdown_handle: worker_handle,
         })
     }
@@ -81,15 +85,17 @@ impl PersistenceManager {
     }
 
     /// Manually save all dirty galaxies
-    pub async fn save_all_dirty(&self) -> Result<usize, crate::db::PersistenceError> {
-        let dirty_galaxies = self.get_dirty_galaxy_names();
+    pub async fn save_all_dirty(
+        &self,
+        galaxies: &mut HashMap<String, Galaxy>,
+    ) -> Result<usize, crate::db::PersistenceError> {
         let mut saved_count = 0;
 
-        for galaxy_name in dirty_galaxies {
-            if let Some(galaxy) = self.get_galaxy_for_persistence(&galaxy_name) {
-                match self.database.save_galaxy_state(&galaxy_name, &galaxy).await {
+        for (galaxy_name, galaxy) in galaxies.iter_mut() {
+            if galaxy.needs_persist() {
+                match self.database.save_galaxy_state(galaxy_name, galaxy).await {
                     Ok(_) => {
-                        self.clear_galaxy_dirty_flag(&galaxy_name);
+                        galaxy.clear_dirty_flag();
                         saved_count += 1;
                         log::debug!("Persisted galaxy: {}", galaxy_name);
                     }
@@ -108,12 +114,11 @@ impl PersistenceManager {
     pub async fn save_galaxy(
         &self,
         galaxy_name: &str,
+        galaxy: &mut Galaxy,
     ) -> Result<bool, crate::db::PersistenceError> {
-        if let Some(galaxy) = self.get_galaxy_for_persistence(galaxy_name) {
-            self.database
-                .save_galaxy_state(galaxy_name, &galaxy)
-                .await?;
-            self.clear_galaxy_dirty_flag(galaxy_name);
+        if galaxy.needs_persist() {
+            self.database.save_galaxy_state(galaxy_name, galaxy).await?;
+            galaxy.clear_dirty_flag();
             log::debug!("Manually persisted galaxy: {}", galaxy_name);
             Ok(true)
         } else {
@@ -121,23 +126,16 @@ impl PersistenceManager {
         }
     }
 
-    /// Load a galaxy from the database into memory
+    /// Load a galaxy from the database.
     pub async fn load_galaxy(
         &self,
         galaxy_name: &str,
-    ) -> Result<bool, crate::db::PersistenceError> {
-        match self.database.load_galaxy(galaxy_name).await? {
-            Some(galaxy) => {
-                #[cfg(feature = "bin")]
-                {
-                    let mut galaxies = (**GALAXIES).lock().unwrap();
-                    galaxies.insert(galaxy_name.to_string(), galaxy);
-                }
-                log::info!("Loaded galaxy from database: {}", galaxy_name);
-                Ok(true)
-            }
-            None => Ok(false), // Galaxy not found in database
+    ) -> Result<Option<crate::Galaxy>, crate::db::PersistenceError> {
+        let galaxy = self.database.load_galaxy(galaxy_name).await?;
+        if galaxy.is_some() {
+            log::info!("Loaded galaxy from database: {}", galaxy_name);
         }
+        Ok(galaxy)
     }
 
     /// Check if a galaxy exists in the database
@@ -157,15 +155,18 @@ impl PersistenceManager {
 
         // Try to save all dirty galaxies one last time
         let timeout = Duration::from_secs(self.config.shutdown_timeout);
-        match tokio::time::timeout(timeout, self.save_all_dirty()).await {
-            Ok(Ok(count)) => {
-                log::info!("Saved {} galaxies during shutdown", count);
-            }
-            Ok(Err(e)) => {
-                log::error!("Error saving galaxies during shutdown: {}", e);
-            }
-            Err(_) => {
-                log::warn!("Timeout while saving galaxies during shutdown");
+        if let Some(galaxies_arc) = self.galaxies.upgrade() {
+            let mut galaxies = galaxies_arc.lock().unwrap();
+            match tokio::time::timeout(timeout, self.save_all_dirty(&mut galaxies)).await {
+                Ok(Ok(count)) => {
+                    log::info!("Saved {} galaxies during shutdown", count);
+                }
+                Ok(Err(e)) => {
+                    log::error!("Error saving galaxies during shutdown: {}", e);
+                }
+                Err(_) => {
+                    log::warn!("Timeout while saving galaxies during shutdown");
+                }
             }
         }
 
@@ -177,6 +178,7 @@ impl PersistenceManager {
         database: Database,
         config: PersistenceConfig,
         shutdown_signal: Arc<AtomicBool>,
+        galaxies_weak: Weak<Mutex<HashMap<String, Galaxy>>>,
     ) {
         let mut save_interval = interval(Duration::from_secs(config.auto_save_interval));
         let mut coalescing_tracker: HashSet<String> = HashSet::new();
@@ -195,8 +197,21 @@ impl PersistenceManager {
                         break;
                     }
 
+                    let Some(galaxies_arc) = galaxies_weak.upgrade() else {
+                        log::warn!("Persistence worker shutting down: AppState dropped.");
+                        break;
+                    };
+
                     // Get list of dirty galaxies
-                    let dirty_galaxies = Self::get_dirty_galaxy_names_static();
+                    let dirty_galaxies = {
+                        let galaxies = galaxies_arc.lock().unwrap();
+                        galaxies
+                            .iter()
+                            .filter(|(_, g)| g.needs_persist())
+                            .map(|(name, _)| name.clone())
+                            .collect::<Vec<_>>()
+                    };
+
 
                     if config.write_coalescing {
                         // Add newly dirty galaxies to coalescing tracker
@@ -209,12 +224,12 @@ impl PersistenceManager {
                         if now.duration_since(last_coalescing_check) >= Duration::from_millis(config.coalescing_delay_ms) {
                             // Persist all galaxies in the coalescing tracker
                             let galaxies_to_save: Vec<_> = coalescing_tracker.drain().collect();
-                            Self::persist_galaxies_batch(&database, galaxies_to_save).await;
+                            Self::persist_galaxies_batch(&database, galaxies_to_save, &galaxies_weak).await;
                             last_coalescing_check = now;
                         }
                     } else {
                         // Persist immediately without coalescing
-                        Self::persist_galaxies_batch(&database, dirty_galaxies).await;
+                        Self::persist_galaxies_batch(&database, dirty_galaxies, &galaxies_weak).await;
                     }
                 }
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {
@@ -229,19 +244,35 @@ impl PersistenceManager {
     }
 
     /// Persist a batch of galaxies
-    async fn persist_galaxies_batch(database: &Database, galaxy_names: Vec<String>) {
+    async fn persist_galaxies_batch(
+        database: &Database,
+        galaxy_names: Vec<String>,
+        galaxies_weak: &Weak<Mutex<HashMap<String, Galaxy>>>,
+    ) {
         if galaxy_names.is_empty() {
             return;
         }
+
+        let Some(galaxies_arc) = galaxies_weak.upgrade() else {
+            return;
+        };
 
         let mut success_count = 0;
         let mut error_count = 0;
 
         for galaxy_name in galaxy_names {
-            if let Some(galaxy) = Self::get_galaxy_for_persistence_static(&galaxy_name) {
+            let galaxy_to_save = {
+                let galaxies = galaxies_arc.lock().unwrap();
+                galaxies.get(&galaxy_name).cloned() // Clone to release the lock
+            };
+
+            if let Some(galaxy) = galaxy_to_save {
                 match database.save_galaxy_state(&galaxy_name, &galaxy).await {
                     Ok(_) => {
-                        Self::clear_galaxy_dirty_flag_static(&galaxy_name);
+                        let mut galaxies = galaxies_arc.lock().unwrap();
+                        if let Some(g) = galaxies.get_mut(&galaxy_name) {
+                            g.clear_dirty_flag();
+                        }
                         success_count += 1;
                         log::debug!("Auto-persisted galaxy: {}", galaxy_name);
                     }
@@ -259,58 +290,6 @@ impl PersistenceManager {
                 success_count,
                 error_count
             );
-        }
-    }
-
-    /// Get list of galaxy names that need persistence
-    fn get_dirty_galaxy_names(&self) -> Vec<String> {
-        Self::get_dirty_galaxy_names_static()
-    }
-
-    fn get_dirty_galaxy_names_static() -> Vec<String> {
-        #[cfg(feature = "bin")]
-        {
-            let galaxies = (**GALAXIES).lock().unwrap();
-            galaxies
-                .iter()
-                .filter(|(_, galaxy)| galaxy.needs_persist())
-                .map(|(name, _)| name.clone())
-                .collect()
-        }
-        #[cfg(not(feature = "bin"))]
-        Vec::new()
-    }
-
-    /// Get a galaxy for persistence (returns a clone to avoid holding the lock)
-    fn get_galaxy_for_persistence(&self, galaxy_name: &str) -> Option<crate::Galaxy> {
-        Self::get_galaxy_for_persistence_static(galaxy_name)
-    }
-
-    fn get_galaxy_for_persistence_static(galaxy_name: &str) -> Option<crate::Galaxy> {
-        #[cfg(feature = "bin")]
-        {
-            let galaxies = (**GALAXIES).lock().unwrap();
-            galaxies
-                .get(galaxy_name)
-                .filter(|g| g.needs_persist())
-                .cloned()
-        }
-        #[cfg(not(feature = "bin"))]
-        None
-    }
-
-    /// Clear the dirty flag for a galaxy
-    fn clear_galaxy_dirty_flag(&self, galaxy_name: &str) {
-        Self::clear_galaxy_dirty_flag_static(galaxy_name);
-    }
-
-    fn clear_galaxy_dirty_flag_static(galaxy_name: &str) {
-        #[cfg(feature = "bin")]
-        {
-            let mut galaxies = (**GALAXIES).lock().unwrap();
-            if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
-                galaxy.clear_dirty_flag();
-            }
         }
     }
 }

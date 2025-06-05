@@ -4,10 +4,15 @@
 ///
 use axum::response::Html;
 
-use galactic_war::{
-    utils::{resource_table, system_info_sync},
-    Coords,
-};
+use galactic_war::{app::AppState, Coords, Resources, SystemProduction};
+
+use std::sync::Arc;
+
+/// Return a standardized HTML table for displaying resources
+pub fn resource_table(resources: &Resources, production: &SystemProduction) -> String {
+    format!("<table width=600 border=1 cellspacing=0 cellpadding=3><tr><td>💰 {}</td><td>🧑 {}</td><td>💧 {}</td><td>🏃 {}/{}/{}</td></tr></table>",
+resources.metal, resources.crew, resources.water, production.metal, production.crew, production.water)
+}
 
 #[derive(Debug)]
 pub struct GalacticWeb {
@@ -15,21 +20,20 @@ pub struct GalacticWeb {
     pub coords: Coords,
     pub body: String,
     pub linkbacks: Vec<(String, String)>,
+    pub app_state: Arc<AppState>,
 }
 
 impl GalacticWeb {
     /// Create a new GalacticWeb instance.
     ///
     /// This corresponds to a single web page.
-    pub fn new(galaxy: &str, coords: Coords) -> GalacticWeb {
-        GalacticWeb {
+    pub fn new(galaxy: &str, coords: Coords, app_state: Arc<AppState>) -> Self {
+        Self {
             galaxy: galaxy.to_string(),
             coords,
             body: String::new(),
-            linkbacks: vec![(
-                "systemname".to_string(),
-                format!("{}/{}", coords.x, coords.y),
-            )],
+            linkbacks: Vec::new(),
+            app_state,
         }
     }
 
@@ -86,7 +90,7 @@ impl GalacticWeb {
         .to_string();
         page.push_str(&self.get_linkback());
         page.push_str("<br><br>");
-        let system_info = system_info_sync(&self.galaxy, self.coords)?;
+        let system_info = self.app_state.system_info_sync(&self.galaxy, self.coords)?;
         page.push_str(&resource_table(
             &system_info.resources,
             &system_info.production,

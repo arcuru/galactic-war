@@ -34,8 +34,8 @@ tasks:
     cmds:
       - nix build
   clippy:
-    desc: Run clippy
-    cmd: cargo clippy
+    desc: Run clippy on all workspace crates
+    cmd: cargo clippy --workspace
   pre-commit:
     desc: Run pre-commit
     cmd: pre-commit run --all-files --show-diff-on-failure
@@ -45,23 +45,35 @@ tasks:
       - cargo fmt --all
       - alejandra .
   test:
-    desc: Run all tests
+    desc: Run all tests in workspace
     aliases: [t]
-    cmd: cargo nextest run
+    cmd: cargo nextest run --workspace
   doc:
-    desc: Build the documentation
-    cmd: cargo doc
+    desc: Build the documentation for all workspace crates
+    cmd: cargo doc --workspace
   audit:
     desc: Run cargo security audit
     cmd: cargo audit
   build:
-    desc: Build the project
+    desc: Build the entire workspace
     aliases: [b]
-    cmd: cargo build
+    cmd: cargo build --workspace
   run:
-    desc: Run the binary
+    desc: Run the galactic-war server binary
     aliases: [r]
-    cmd: cargo run
+    cmd: cargo run --bin galactic-war
+  build:lib:
+    desc: Build only the library crate
+    cmd: cargo build -p galactic-war
+  build:bin:
+    desc: Build only the binary crate
+    cmd: cargo build -p galactic-war-bin
+  test:lib:
+    desc: Run tests for library crate only
+    cmd: cargo nextest run -p galactic-war
+  test:bin:
+    desc: Run tests for binary crate only
+    cmd: cargo nextest run -p galactic-war-bin
   build:docker:
     desc: Build the docker image
     cmd: docker build -t galactic-war .

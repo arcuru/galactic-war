@@ -1,0 +1,22 @@
+[package]
+name = "galactic-war-bin"
+version.workspace = true
+description = "Galactic War web server binary"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[[bin]]
+name = "galactic-war"
+path = "src/main.rs"
+
+[dependencies]
+galactic-war = { path = "../lib", features = ["db"] }
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+serde_yaml = "0.9"
+log = "0.4"
+env_logger = "0.10"

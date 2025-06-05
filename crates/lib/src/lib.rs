@@ -1,16 +1,11 @@
+use game_system::EventInfo;
 use indexmap::IndexMap;
 use rand::Rng;
 use std::collections::HashMap;
-use system::EventInfo;
 
-#[cfg(feature = "bin")]
 pub mod app;
 pub mod config;
-mod system;
-
-// Shared utilities (only available with 'bin' feature)
-#[cfg(feature = "bin")]
-pub mod utils;
+mod game_system;
 
 // Database and models modules
 #[cfg(feature = "db")]
@@ -21,15 +16,23 @@ pub mod models;
 pub mod persistence;
 
 use crate::config::GalaxyConfig;
-use crate::system::System;
+use crate::game_system::System;
 
-pub use crate::system::{Event, EventCallback, StructureType};
+pub use crate::game_system::{Event, EventCallback, StructureType};
 
 // Re-export database types when db feature is enabled
 #[cfg(feature = "db")]
 pub use crate::db::{Database, PersistenceError};
 #[cfg(feature = "db")]
 pub use crate::models::*;
+
+/// Return the current second since the Unix epoch
+pub fn tick() -> usize {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as usize
+}
 
 #[derive(Debug, Clone)]
 pub struct Galaxy {
