@@ -12,6 +12,7 @@ pub struct SystemRow {
     pub metal: i64,
     pub crew: i64,
     pub water: i64,
+    pub current_tick: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -25,6 +26,7 @@ impl SystemRow {
         metal: usize,
         crew: usize,
         water: usize,
+        current_tick: usize,
     ) -> Self {
         let now = Utc::now();
         Self {
@@ -35,6 +37,7 @@ impl SystemRow {
             metal: metal as i64,
             crew: crew as i64,
             water: water as i64,
+            current_tick: current_tick as i64,
             created_at: now,
             updated_at: now,
         }
@@ -46,6 +49,10 @@ impl SystemRow {
 
     pub fn resources(&self) -> (usize, usize, usize) {
         (self.metal as usize, self.crew as usize, self.water as usize)
+    }
+
+    pub fn current_tick_as_usize(&self) -> usize {
+        self.current_tick as usize
     }
 }
 

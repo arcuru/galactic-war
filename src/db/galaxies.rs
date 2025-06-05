@@ -198,15 +198,17 @@ impl Database {
         system: &System,
     ) -> Result<i64, PersistenceError> {
         let resources = system.get_resources();
+        let current_tick = system.get_current_tick();
 
         let result = sqlx::query(
             r#"
-            INSERT INTO systems (galaxy_name, x, y, metal, crew, water, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO systems (galaxy_name, x, y, metal, crew, water, current_tick, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(galaxy_name, x, y) DO UPDATE SET
                 metal = excluded.metal,
                 crew = excluded.crew,
                 water = excluded.water,
+                current_tick = excluded.current_tick,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING id
             "#,
@@ -217,6 +219,7 @@ impl Database {
         .bind(resources.metal as i64)
         .bind(resources.crew as i64)
         .bind(resources.water as i64)
+        .bind(current_tick as i64)
         .execute(&mut **tx)
         .await?;
 
@@ -236,10 +239,13 @@ impl Database {
         let config: GalaxyConfig = serde_yaml::from_str(&galaxy_row.config_file)?;
 
         // Load all systems for this galaxy
-        let systems = self.load_systems_for_galaxy(galaxy_name).await?;
+        let current_tick = galaxy_row.tick_as_usize();
+        let systems = self
+            .load_systems_for_galaxy(galaxy_name, current_tick)
+            .await?;
 
         // Create galaxy with loaded data
-        let mut galaxy = Galaxy::new(config, galaxy_row.tick_as_usize());
+        let mut galaxy = Galaxy::new(config, current_tick);
         galaxy.replace_systems(systems);
 
         Ok(Some(galaxy))
@@ -249,6 +255,7 @@ impl Database {
     async fn load_systems_for_galaxy(
         &self,
         galaxy_name: &str,
+        _galaxy_current_tick: usize,
     ) -> Result<HashMap<Coords, System>, PersistenceError> {
         let system_rows = self.get_systems(galaxy_name).await?;
         let mut systems = HashMap::new();
@@ -282,11 +289,8 @@ impl Database {
                 .into_iter()
                 .filter_map(|row| {
                     let action = match row.action_type.as_str() {
-                        "Metal" => Some(EventCallback::Metal),
-                        "Water" => Some(EventCallback::Water),
-                        "Crew" => Some(EventCallback::Crew),
                         "Build" => Some(EventCallback::Build),
-                        _ => None,
+                        _ => None, // Only Build events are supported now
                     }?;
 
                     let structure = row
@@ -301,7 +305,9 @@ impl Database {
                 })
                 .collect();
 
-            let system = System::from_database(resources, structures, events);
+            // Use each system's stored current_tick
+            let system_current_tick = system_row.current_tick_as_usize();
+            let system = System::from_database(system_current_tick, resources, structures, events);
             systems.insert(coords, system);
         }
 
@@ -483,6 +489,113 @@ mod tests {
 
         // Verify systems count matches
         assert_eq!(loaded_galaxy.systems().len(), galaxy.systems().len());
+
+        db.close().await;
+    }
+
+    #[tokio::test]
+    async fn test_system_individual_tick_persistence() {
+        let db = Database::new_test()
+            .await
+            .expect("Failed to create test database");
+
+        let galaxy_name = "tick_test_galaxy";
+
+        // Create a galaxy with minimal config
+        let config = GalaxyConfig::default();
+        let mut galaxy = db
+            .create_galaxy_with_config(galaxy_name, &config, 1000)
+            .await
+            .expect("Failed to create galaxy");
+
+        // This test demonstrates the critical bug: systems at different ticks
+        // should maintain their individual current_tick values when saved/loaded
+
+        // Add two systems manually with different current_tick values
+        use crate::{Coords, Resources, System};
+        use std::collections::HashMap;
+
+        let coords1 = Coords { x: 10, y: 20 };
+        let coords2 = Coords { x: 30, y: 40 };
+
+        // Create system 1 at tick 500 (behind galaxy tick)
+        let system1 = System::from_database(
+            500, // current_tick = 500
+            Resources {
+                metal: 100,
+                crew: 50,
+                water: 75,
+            },
+            vec![], // no structures
+            vec![], // no events
+        );
+
+        // Create system 2 at tick 800 (still behind galaxy tick)
+        let system2 = System::from_database(
+            800, // current_tick = 800
+            Resources {
+                metal: 200,
+                crew: 100,
+                water: 150,
+            },
+            vec![], // no structures
+            vec![], // no events
+        );
+
+        // Add systems to galaxy
+        let mut systems = HashMap::new();
+        systems.insert(coords1, system1);
+        systems.insert(coords2, system2);
+        galaxy.replace_systems(systems);
+
+        // Mark as dirty and save
+        galaxy.mark_all_dirty();
+        db.save_galaxy_state(galaxy_name, &galaxy)
+            .await
+            .expect("Failed to save galaxy state");
+
+        // Load the galaxy back
+        let loaded_galaxy = db
+            .load_galaxy(galaxy_name)
+            .await
+            .expect("Failed to load galaxy")
+            .expect("Galaxy should exist");
+
+        // Verify the galaxy tick is preserved
+        assert_eq!(loaded_galaxy.get_tick(), 1000);
+
+        // CRITICAL TEST: Verify each system maintains its individual current_tick
+        let loaded_system1 = loaded_galaxy.systems().get(&coords1).unwrap();
+        let loaded_system2 = loaded_galaxy.systems().get(&coords2).unwrap();
+
+        assert_eq!(
+            loaded_system1.get_current_tick(),
+            500,
+            "System 1 should maintain its current_tick of 500"
+        );
+        assert_eq!(
+            loaded_system2.get_current_tick(),
+            800,
+            "System 2 should maintain its current_tick of 800"
+        );
+
+        // Verify resources are preserved
+        assert_eq!(
+            loaded_system1.get_resources(),
+            Resources {
+                metal: 100,
+                crew: 50,
+                water: 75
+            }
+        );
+        assert_eq!(
+            loaded_system2.get_resources(),
+            Resources {
+                metal: 200,
+                crew: 100,
+                water: 150
+            }
+        );
 
         db.close().await;
     }

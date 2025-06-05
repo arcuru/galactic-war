@@ -392,15 +392,23 @@ async fn galaxy_stats_get(
                 let mut activity = String::new();
                 let mut activity_hover = String::new();
                 for event in info.events.iter() {
-                    if let EventCallback::Build = event.action {
-                        activity.push_str("🏗️");
-                        let eta = event.completion - tick();
+                    // For now we only have 1 event type, but we'll add more later
+                    #[allow(unreachable_patterns)]
+                    match event.action {
+                        EventCallback::Build => {
+                            activity.push_str("🏗️");
+                            let eta = event.completion - tick();
 
-                        activity_hover.push_str(&format!(
-                            "Structure {}: {} remaining",
-                            event.structure.unwrap(),
-                            seconds_to_readable(eta)
-                        ));
+                            activity_hover.push_str(&format!(
+                                "Structure {}: {} remaining",
+                                event.structure.unwrap(),
+                                seconds_to_readable(eta)
+                            ));
+                        }
+                        _ => {
+                            activity.push('🔄');
+                            activity_hover.push_str("Something is wrong");
+                        }
                     }
                 }
                 page.push_str(&format!(

@@ -16,15 +16,17 @@ impl Database {
         metal: usize,
         crew: usize,
         water: usize,
+        current_tick: usize,
     ) -> Result<i64, PersistenceError> {
         let result = sqlx::query(
             r#"
-            INSERT INTO systems (galaxy_name, x, y, metal, crew, water, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO systems (galaxy_name, x, y, metal, crew, water, current_tick, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(galaxy_name, x, y) DO UPDATE SET
                 metal = excluded.metal,
                 crew = excluded.crew,
                 water = excluded.water,
+                current_tick = excluded.current_tick,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING id
             "#,
@@ -35,6 +37,7 @@ impl Database {
         .bind(metal as i64)
         .bind(crew as i64)
         .bind(water as i64)
+        .bind(current_tick as i64)
         .fetch_one(&self.pool)
         .await?;
 
@@ -43,7 +46,7 @@ impl Database {
 
     /// Get all systems for a galaxy
     pub async fn get_systems(&self, galaxy_name: &str) -> Result<Vec<SystemRow>, PersistenceError> {
-        let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, created_at, updated_at FROM systems WHERE galaxy_name = ?")
+        let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, created_at, updated_at FROM systems WHERE galaxy_name = ?")
             .bind(galaxy_name)
             .fetch_all(&self.pool)
             .await?;
@@ -58,6 +61,7 @@ impl Database {
                 metal: row.get("metal"),
                 crew: row.get("crew"),
                 water: row.get("water"),
+                current_tick: row.get("current_tick"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             });
@@ -73,7 +77,7 @@ impl Database {
         x: usize,
         y: usize,
     ) -> Result<Option<SystemRow>, PersistenceError> {
-        let result = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, created_at, updated_at FROM systems WHERE galaxy_name = ? AND x = ? AND y = ?")
+        let result = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, created_at, updated_at FROM systems WHERE galaxy_name = ? AND x = ? AND y = ?")
             .bind(galaxy_name)
             .bind(x as i64)
             .bind(y as i64)
@@ -89,6 +93,7 @@ impl Database {
                 metal: row.get("metal"),
                 crew: row.get("crew"),
                 water: row.get("water"),
+                current_tick: row.get("current_tick"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             }))
@@ -135,7 +140,7 @@ mod tests {
 
         // Test system creation
         let system_id = db
-            .save_system(galaxy_name, x, y, metal, crew, water)
+            .save_system(galaxy_name, x, y, metal, crew, water, 0)
             .await
             .expect("Failed to save system");
 
@@ -168,7 +173,7 @@ mod tests {
         let new_water = 700;
 
         let updated_system_id = db
-            .save_system(galaxy_name, x, y, new_metal, new_crew, new_water)
+            .save_system(galaxy_name, x, y, new_metal, new_crew, new_water, 0)
             .await
             .expect("Failed to update system");
 
@@ -215,7 +220,7 @@ mod tests {
         ];
 
         for (x, y, metal, crew, water) in &systems_data {
-            db.save_system(galaxy_name, *x, *y, *metal, *crew, *water)
+            db.save_system(galaxy_name, *x, *y, *metal, *crew, *water, 0)
                 .await
                 .expect("Failed to save system");
         }
