@@ -5,6 +5,7 @@ Galactic War implements a sophisticated database persistence system that automat
 ## Overview
 
 The persistence system provides:
+
 - **Automatic Background Saves**: Configurable periodic persistence without blocking gameplay
 - **Real-time State Tracking**: All changes are tracked and saved transparently
 - **Graceful Degradation**: Continues operation if database is unavailable
@@ -37,6 +38,7 @@ The persistence system provides:
 The persistence layer uses SQLite with the following schema:
 
 **Galaxies Table**
+
 ```sql
 CREATE TABLE galaxies (
     name TEXT PRIMARY KEY,
@@ -48,6 +50,7 @@ CREATE TABLE galaxies (
 ```
 
 **Systems Table**
+
 ```sql
 CREATE TABLE systems (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,6 +68,7 @@ CREATE TABLE systems (
 ```
 
 **Structures Table**
+
 ```sql
 CREATE TABLE structures (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,6 +83,7 @@ CREATE TABLE structures (
 ```
 
 **Events Table**
+
 ```sql
 CREATE TABLE events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,14 +102,14 @@ CREATE TABLE events (
 
 The persistence system is configured through environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `sqlite:galactic_war.db` | Database connection string |
-| `GALACTIC_WAR_PERSISTENCE` | `true` | Enable/disable persistence |
-| `GALACTIC_WAR_AUTO_SAVE_INTERVAL` | `30` | Auto-save interval (seconds) |
-| `GALACTIC_WAR_SHUTDOWN_TIMEOUT` | `10` | Shutdown save timeout (seconds) |
-| `GALACTIC_WAR_WRITE_COALESCING` | `true` | Enable write batching |
-| `GALACTIC_WAR_COALESCING_DELAY_MS` | `1000` | Write coalescing delay (ms) |
+| Variable                           | Default                  | Description                     |
+| ---------------------------------- | ------------------------ | ------------------------------- |
+| `DATABASE_URL`                     | `sqlite:galactic_war.db` | Database connection string      |
+| `GALACTIC_WAR_PERSISTENCE`         | `true`                   | Enable/disable persistence      |
+| `GALACTIC_WAR_AUTO_SAVE_INTERVAL`  | `30`                     | Auto-save interval (seconds)    |
+| `GALACTIC_WAR_SHUTDOWN_TIMEOUT`    | `10`                     | Shutdown save timeout (seconds) |
+| `GALACTIC_WAR_WRITE_COALESCING`    | `true`                   | Enable write batching           |
+| `GALACTIC_WAR_COALESCING_DELAY_MS` | `1000`                   | Write coalescing delay (ms)     |
 
 ### Example Configuration
 
@@ -136,6 +141,7 @@ PersistenceConfig {
 ```
 
 **How it works:**
+
 1. Galaxy operations mark systems as "dirty" when modified
 2. Background worker checks for dirty galaxies every interval
 3. Dirty galaxies are saved to database in batched transactions
@@ -166,6 +172,7 @@ impl Galaxy {
 ```
 
 **Benefits:**
+
 - Only modified systems are persisted
 - Reduces database write volume
 - Improves performance for large galaxies
@@ -194,7 +201,7 @@ pub async fn get_galaxy_details(&self, galaxy_name: &str, ...) -> Result<Details
             return galaxy.get_details(tick, coords, structure);
         }
     }
-    
+
     // Auto-load from database if not in memory
     if let Some(ref pm) = self.persistence_manager {
         pm.load_galaxy(galaxy_name).await?;
@@ -217,6 +224,7 @@ The system continues operating even if persistence fails:
 ### Connection Pooling
 
 Uses SQLite connection pooling for efficient database access:
+
 - Multiple concurrent operations
 - Automatic connection lifecycle management
 - Configurable pool size and timeouts
@@ -224,6 +232,7 @@ Uses SQLite connection pooling for efficient database access:
 ### Transactional Batching
 
 All related changes are saved in single transactions:
+
 - Atomic updates ensure consistency
 - Reduces transaction overhead
 - Improves write performance
@@ -313,6 +322,7 @@ RUST_LOG=galactic_war::persistence=debug cargo run --features bin,db
 ```
 
 **Log Events:**
+
 - Galaxy creation and loading
 - Auto-save operations
 - Error conditions and recovery
@@ -321,6 +331,7 @@ RUST_LOG=galactic_war::persistence=debug cargo run --features bin,db
 ### Metrics
 
 The system tracks key performance indicators:
+
 - Save operation duration
 - Number of dirty systems persisted
 - Database operation success/failure rates
@@ -331,9 +342,11 @@ The system tracks key performance indicators:
 **Common Issues:**
 
 1. **Database Locked**: Multiple processes accessing same SQLite file
+
    - Solution: Use unique database files or enable WAL mode
 
 2. **Slow Performance**: Large galaxies with frequent changes
+
    - Solution: Increase auto-save interval or enable write coalescing
 
 3. **Disk Space**: Database file grows over time
@@ -353,18 +366,21 @@ sqlx::migrate!("./migrations").run(&pool).await?;
 ### Backup Strategies
 
 **Simple Backup**:
+
 ```bash
 # Copy database file
 cp galactic_war.db galactic_war_backup.db
 ```
 
 **Online Backup**:
+
 ```sql
 -- SQLite online backup
 .backup backup.db
 ```
 
 **Automated Backup**:
+
 ```bash
 # Cron job for daily backups
 0 2 * * * cp /data/galactic_war.db /backups/galactic_war_$(date +\%Y\%m\%d).db
@@ -373,18 +389,21 @@ cp galactic_war.db galactic_war_backup.db
 ## Future Enhancements
 
 ### PostgreSQL Support
+
 - Multi-server deployments
 - Enhanced concurrency
 - Advanced replication features
 
 ### Compression
+
 - Compress historical events
 - Archive old galaxy data
 - Reduce storage requirements
 
 ### Analytics
+
 - Query performance optimization
 - Data usage analytics
 - Predictive caching
 
-The database persistence system provides a solid foundation for data durability while maintaining the high performance characteristics required for real-time gameplay. 
+The database persistence system provides a solid foundation for data durability while maintaining the high performance characteristics required for real-time gameplay.

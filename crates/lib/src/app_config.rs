@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 /// Application configuration that can be loaded from YAML and overridden by environment variables
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct AppConfig {
     pub persistence: PersistenceSettings,
 }
@@ -41,14 +41,6 @@ fn default_shutdown_timeout() -> u64 {
 }
 fn default_coalescing_delay() -> u64 {
     1000
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            persistence: PersistenceSettings::default(),
-        }
-    }
 }
 
 impl Default for PersistenceSettings {
