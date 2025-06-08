@@ -19,6 +19,7 @@ CREATE TABLE systems (
     metal INTEGER NOT NULL DEFAULT 0,
     crew INTEGER NOT NULL DEFAULT 0,
     water INTEGER NOT NULL DEFAULT 0,
+    current_tick INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (galaxy_name) REFERENCES galaxies(name) ON DELETE CASCADE,
@@ -51,4 +52,4 @@ CREATE TABLE events (
 -- Indexes for performance
 CREATE INDEX idx_systems_galaxy_coords ON systems(galaxy_name, x, y);
 CREATE INDEX idx_events_system_completion ON events(system_id, completion_tick);
-CREATE INDEX idx_structures_system ON structures(system_id); 
+CREATE INDEX idx_structures_system ON structures(system_id);
