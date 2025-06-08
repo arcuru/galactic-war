@@ -10,7 +10,11 @@ mod web;
 
 use crate::web::GalacticWeb;
 
-use axum::{extract::Path, routing::{get, post}, Extension, Router};
+use axum::{
+    extract::Path,
+    routing::{get, post},
+    Extension, Router,
+};
 use std::cmp::max;
 use std::str::FromStr;
 
@@ -205,22 +209,23 @@ async fn system_build_struct(
     if let Some(user) = auth::get_current_user(jar, Extension(app_state.clone())).await {
         if let Some(db) = app_state.database() {
             let user_service = galactic_war::UserService::new(db.clone());
-                
-                // Check if user has an account in this galaxy
-                if let Ok(Some(account)) = user_service.get_user_galaxy_account(user.id, &galaxy).await {
-                    // Check if user owns this system
-                    if let Ok(user_systems) = user_service.get_user_systems_coords(account.id).await {
-                        let coords = (x, y).into();
-                        if user_systems.contains(&coords) {
-                            // User owns this system, allow the build
-                            let structure_type = StructureType::from_str(&structure)
-                                .map_err(|_| format!("Invalid structure type: {}", structure))?;
-                            let event = app_state
-                                .build_structure(&galaxy, tick(), coords, structure_type)
-                                .await?;
-                            return Ok(format!("{:?}", event));
-                        }
+
+            // Check if user has an account in this galaxy
+            if let Ok(Some(account)) = user_service.get_user_galaxy_account(user.id, &galaxy).await
+            {
+                // Check if user owns this system
+                if let Ok(user_systems) = user_service.get_user_systems_coords(account.id).await {
+                    let coords = (x, y).into();
+                    if user_systems.contains(&coords) {
+                        // User owns this system, allow the build
+                        let structure_type = StructureType::from_str(&structure)
+                            .map_err(|_| format!("Invalid structure type: {}", structure))?;
+                        let event = app_state
+                            .build_structure(&galaxy, tick(), coords, structure_type)
+                            .await?;
+                        return Ok(format!("{:?}", event));
                     }
+                }
             }
         }
         Err("You don't own this system".to_string())
@@ -239,21 +244,22 @@ async fn system_build(
     if let Some(user) = auth::get_current_user(jar, Extension(app_state.clone())).await {
         if let Some(db) = app_state.database() {
             let user_service = galactic_war::UserService::new(db.clone());
-                
-                // Check if user has an account in this galaxy
-                if let Ok(Some(account)) = user_service.get_user_galaxy_account(user.id, &galaxy).await {
-                    // Check if user owns this system
-                    if let Ok(user_systems) = user_service.get_user_systems_coords(account.id).await {
-                        let coords = (x, y).into();
-                        if !user_systems.contains(&coords) {
-                            return Err("You don't own this system".to_string());
-                        }
-                    } else {
-                        return Err("Failed to check system ownership".to_string());
+
+            // Check if user has an account in this galaxy
+            if let Ok(Some(account)) = user_service.get_user_galaxy_account(user.id, &galaxy).await
+            {
+                // Check if user owns this system
+                if let Ok(user_systems) = user_service.get_user_systems_coords(account.id).await {
+                    let coords = (x, y).into();
+                    if !user_systems.contains(&coords) {
+                        return Err("You don't own this system".to_string());
                     }
                 } else {
-                    return Err("You don't have an account in this galaxy".to_string());
+                    return Err("Failed to check system ownership".to_string());
                 }
+            } else {
+                return Err("You don't have an account in this galaxy".to_string());
+            }
         } else {
             return Err("User authentication not available".to_string());
         }

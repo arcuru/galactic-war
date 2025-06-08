@@ -1,6 +1,6 @@
+use argon2::password_hash::{rand_core::OsRng, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Duration, Utc};
-use rand::Rng;
-use sha2::{Digest, Sha256};
 
 #[cfg(feature = "db")]
 use crate::db::{Database, PersistenceError};
@@ -17,23 +17,23 @@ pub struct AuthService {
 pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
-    
+
     #[error("User already exists")]
     UserAlreadyExists,
-    
+
     #[error("Session expired")]
     SessionExpired,
-    
+
     #[error("Session not found")]
     SessionNotFound,
-    
+
     #[error("Invalid session token")]
     InvalidSessionToken,
-    
+
     #[error("Database error: {0}")]
     #[cfg(feature = "db")]
     Database(#[from] PersistenceError),
-    
+
     #[error("Password hashing error")]
     PasswordHashing,
 }
@@ -45,24 +45,24 @@ impl AuthService {
         Self { db }
     }
 
-    /// Hash a password using SHA-256 with salt
-    pub fn hash_password(password: &str, salt: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(salt.as_bytes());
-        hasher.update(password.as_bytes());
-        format!("{:x}", hasher.finalize())
-    }
+    /// Hash a password using Argon2id
+    pub fn hash_password(password: &str) -> Result<String, AuthError> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            argon2::Params::default(),
+        );
 
-    /// Generate a random salt for password hashing
-    pub fn generate_salt() -> String {
-        let mut rng = rand::thread_rng();
-        (0..32)
-            .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
-            .collect()
+        argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+            .map_err(|_| AuthError::PasswordHashing)
     }
 
     /// Generate a secure session token
     pub fn generate_session_token() -> String {
+        use rand::Rng;
         let mut rng = rand::thread_rng();
         (0..64)
             .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
@@ -80,18 +80,17 @@ impl AuthService {
         if let Some(_) = self.db.get_user_by_username(username).await? {
             return Err(AuthError::UserAlreadyExists);
         }
-        
+
         if let Some(_) = self.db.get_user_by_email(email).await? {
             return Err(AuthError::UserAlreadyExists);
         }
 
         // Hash the password
-        let salt = Self::generate_salt();
-        let password_hash = format!("{}:{}", salt, Self::hash_password(password, &salt));
+        let password_hash = Self::hash_password(password)?;
 
         // Create the user
         let user_id = self.db.create_user(username, email, &password_hash).await?;
-        
+
         // Return the user without password hash
         Ok(User {
             id: user_id,
@@ -125,9 +124,15 @@ impl AuthService {
 
     /// Verify a password against a stored hash
     fn verify_password(&self, password: &str, stored_hash: &str) -> bool {
-        if let Some((salt, hash)) = stored_hash.split_once(':') {
-            let computed_hash = Self::hash_password(password, salt);
-            computed_hash == hash
+        if let Ok(parsed_hash) = PasswordHash::new(stored_hash) {
+            let argon2 = Argon2::new(
+                argon2::Algorithm::Argon2id,
+                argon2::Version::V0x13,
+                argon2::Params::default(),
+            );
+            argon2
+                .verify_password(password.as_bytes(), &parsed_hash)
+                .is_ok()
         } else {
             false
         }
@@ -138,7 +143,9 @@ impl AuthService {
         let session_token = Self::generate_session_token();
         let expires_at = Utc::now() + Duration::hours(24); // 24 hour sessions
 
-        self.db.create_user_session(&session_token, user_id, expires_at).await?;
+        self.db
+            .create_user_session(&session_token, user_id, expires_at)
+            .await?;
 
         Ok(UserSession {
             token: session_token,
@@ -149,7 +156,8 @@ impl AuthService {
 
     /// Validate a session token and return the user
     pub async fn validate_session(&self, session_token: &str) -> Result<User, AuthError> {
-        let session = self.db
+        let session = self
+            .db
             .get_user_session(session_token)
             .await?
             .ok_or(AuthError::SessionNotFound)?;
@@ -162,7 +170,8 @@ impl AuthService {
         }
 
         // Get the user
-        let user_row = self.db
+        let user_row = self
+            .db
             .get_user_by_id(session.user_id)
             .await?
             .ok_or(AuthError::InvalidSessionToken)?;
@@ -223,22 +232,30 @@ mod tests {
     #[tokio::test]
     async fn test_password_hashing() {
         let password = "test_password_123";
-        let salt = AuthService::generate_salt();
-        let hash1 = AuthService::hash_password(password, &salt);
-        let hash2 = AuthService::hash_password(password, &salt);
-        
-        // Same password and salt should produce same hash
-        assert_eq!(hash1, hash2);
-        
-        // Different salt should produce different hash
-        let different_salt = AuthService::generate_salt();
-        let hash3 = AuthService::hash_password(password, &different_salt);
-        assert_ne!(hash1, hash3);
+        let hash1 = AuthService::hash_password(password).expect("Failed to hash password");
+        let hash2 = AuthService::hash_password(password).expect("Failed to hash password");
+
+        // Different hashes should be generated due to random salts
+        assert_ne!(hash1, hash2);
+
+        // Both hashes should verify against the same password
+        let auth = AuthService::new(
+            Database::new_test()
+                .await
+                .expect("Failed to create test database"),
+        );
+        assert!(auth.verify_password(password, &hash1));
+        assert!(auth.verify_password(password, &hash2));
+
+        // Wrong password should not verify
+        assert!(!auth.verify_password("wrong_password", &hash1));
     }
 
     #[tokio::test]
     async fn test_user_registration_and_authentication() {
-        let db = Database::new_test().await.expect("Failed to create test database");
+        let db = Database::new_test()
+            .await
+            .expect("Failed to create test database");
         let auth = AuthService::new(db);
 
         let username = "testuser";
@@ -257,7 +274,10 @@ mod tests {
 
         // Test duplicate registration fails
         let duplicate_result = auth.register_user(username, email, password).await;
-        assert!(matches!(duplicate_result, Err(AuthError::UserAlreadyExists)));
+        assert!(matches!(
+            duplicate_result,
+            Err(AuthError::UserAlreadyExists)
+        ));
 
         // Test authentication with username
         let auth_user = auth
@@ -284,7 +304,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_management() {
-        let db = Database::new_test().await.expect("Failed to create test database");
+        let db = Database::new_test()
+            .await
+            .expect("Failed to create test database");
         let auth = AuthService::new(db);
 
         // Create a user first
@@ -311,9 +333,7 @@ mod tests {
         assert_eq!(validated_user.id, user.id);
 
         // Logout (delete session)
-        auth.logout(&session.token)
-            .await
-            .expect("Failed to logout");
+        auth.logout(&session.token).await.expect("Failed to logout");
 
         // Session should no longer be valid
         let invalid_session = auth.validate_session(&session.token).await;
@@ -322,7 +342,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_expiry() {
-        let db = Database::new_test().await.expect("Failed to create test database");
+        let db = Database::new_test()
+            .await
+            .expect("Failed to create test database");
         let auth = AuthService::new(db);
 
         // Create a user
@@ -334,7 +356,7 @@ mod tests {
         // Create an expired session manually
         let expired_token = AuthService::generate_session_token();
         let expired_time = Utc::now() - Duration::hours(1); // 1 hour ago
-        
+
         auth.db
             .create_user_session(&expired_token, user.id, expired_time)
             .await

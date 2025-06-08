@@ -54,7 +54,7 @@ graph TD
 - Per-galaxy activity tracking
 
 ### Security
-- Password hashing with SHA-256 and random salt
+- Password hashing with Argon2id
 - HTTP-only session cookies
 - Session validation on protected routes
 - Automatic expired session cleanup
@@ -83,7 +83,7 @@ graph TD
 - `id`: Primary key
 - `username`: Unique username
 - `email`: Unique email address
-- `password_hash`: Salted SHA-256 hash
+- `password_hash`: Argon2id hash
 - `created_at`, `updated_at`: Timestamps
 
 ### User Galaxy Accounts Table

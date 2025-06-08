@@ -504,7 +504,7 @@ impl AppState {
                 if let Some(coords) = galaxy.create_user_system(tick) {
                     // Get galaxy config first (immutable borrow)
                     let galaxy_config = galaxy.get_config().clone();
-                    
+
                     // Now get mutable system reference
                     let system = galaxy.systems_mut().get_mut(&coords).unwrap();
                     let system_info = SystemInfo {

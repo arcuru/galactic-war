@@ -167,7 +167,11 @@ impl System {
     }
 
     /// Get the production of the system
-    pub fn get_production(&mut self, _tick: usize, galaxy_config: &GalaxyConfig) -> SystemProduction {
+    pub fn get_production(
+        &mut self,
+        _tick: usize,
+        galaxy_config: &GalaxyConfig,
+    ) -> SystemProduction {
         let mut production = SystemProduction {
             metal: 0,
             crew: 0,

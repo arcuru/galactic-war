@@ -1,7 +1,7 @@
 #[cfg(feature = "db")]
 use super::{Database, PersistenceError};
 #[cfg(feature = "db")]
-use crate::models::{UserRow, UserGalaxyAccountRow, UserSessionRow};
+use crate::models::{UserGalaxyAccountRow, UserRow, UserSessionRow};
 #[cfg(feature = "db")]
 use chrono::{DateTime, Utc};
 #[cfg(feature = "db")]
@@ -33,7 +33,10 @@ impl Database {
     }
 
     /// Get a user by username
-    pub async fn get_user_by_username(&self, username: &str) -> Result<Option<UserRow>, PersistenceError> {
+    pub async fn get_user_by_username(
+        &self,
+        username: &str,
+    ) -> Result<Option<UserRow>, PersistenceError> {
         let result = sqlx::query("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(&self.pool)
@@ -54,7 +57,10 @@ impl Database {
     }
 
     /// Get a user by email
-    pub async fn get_user_by_email(&self, email: &str) -> Result<Option<UserRow>, PersistenceError> {
+    pub async fn get_user_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<UserRow>, PersistenceError> {
         let result = sqlx::query("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE email = ?")
             .bind(email)
             .fetch_optional(&self.pool)
@@ -147,7 +153,10 @@ impl Database {
     }
 
     /// Get all galaxy accounts for a user
-    pub async fn get_user_galaxy_accounts(&self, user_id: i64) -> Result<Vec<UserGalaxyAccountRow>, PersistenceError> {
+    pub async fn get_user_galaxy_accounts(
+        &self,
+        user_id: i64,
+    ) -> Result<Vec<UserGalaxyAccountRow>, PersistenceError> {
         let rows = sqlx::query(
             "SELECT id, user_id, galaxy_name, account_name, joined_at, last_active FROM user_galaxy_accounts WHERE user_id = ? ORDER BY last_active DESC"
         )
@@ -194,22 +203,23 @@ impl Database {
         user_id: i64,
         expires_at: DateTime<Utc>,
     ) -> Result<(), PersistenceError> {
-        sqlx::query(
-            "INSERT INTO user_sessions (id, user_id, expires_at) VALUES (?, ?, ?)"
-        )
-        .bind(session_token)
-        .bind(user_id)
-        .bind(expires_at)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("INSERT INTO user_sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+            .bind(session_token)
+            .bind(user_id)
+            .bind(expires_at)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }
 
     /// Get a user session
-    pub async fn get_user_session(&self, session_token: &str) -> Result<Option<UserSessionRow>, PersistenceError> {
+    pub async fn get_user_session(
+        &self,
+        session_token: &str,
+    ) -> Result<Option<UserSessionRow>, PersistenceError> {
         let result = sqlx::query(
-            "SELECT id, user_id, expires_at, created_at FROM user_sessions WHERE id = ?"
+            "SELECT id, user_id, expires_at, created_at FROM user_sessions WHERE id = ?",
         )
         .bind(session_token)
         .fetch_optional(&self.pool)

@@ -136,7 +136,10 @@ impl Database {
     }
 
     /// Get unowned systems in a galaxy (for assignment to new users)
-    pub async fn get_unowned_systems(&self, galaxy_name: &str) -> Result<Vec<SystemRow>, PersistenceError> {
+    pub async fn get_unowned_systems(
+        &self,
+        galaxy_name: &str,
+    ) -> Result<Vec<SystemRow>, PersistenceError> {
         let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, user_galaxy_account_id, created_at, updated_at FROM systems WHERE galaxy_name = ? AND user_galaxy_account_id IS NULL")
             .bind(galaxy_name)
             .fetch_all(&self.pool)

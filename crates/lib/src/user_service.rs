@@ -1,7 +1,7 @@
 /// User service that handles galaxy account management and system assignment
 #[cfg(feature = "db")]
 use crate::{
-    auth::{AuthService, AuthError},
+    auth::{AuthError, AuthService},
     db::{Database, PersistenceError},
     models::UserGalaxyAccount,
     Coords,
@@ -12,20 +12,20 @@ pub enum UserServiceError {
     #[error("Authentication error: {0}")]
     #[cfg(feature = "db")]
     Auth(#[from] AuthError),
-    
+
     #[error("Database error: {0}")]
     #[cfg(feature = "db")]
     Database(#[from] PersistenceError),
-    
+
     #[error("Galaxy is full, no available coordinates for new system")]
     GalaxyFull,
-    
+
     #[error("Account name already taken in this galaxy")]
     AccountNameTaken,
-    
+
     #[error("User already has an account in this galaxy")]
     UserAlreadyInGalaxy,
-    
+
     #[error("User does not have an account in this galaxy")]
     UserNotInGalaxy,
 }
@@ -59,21 +59,33 @@ impl UserService {
         app_state: &crate::app::AppState,
     ) -> Result<(UserGalaxyAccount, Coords), UserServiceError> {
         // Check if user already has an account in this galaxy
-        if let Some(_) = self.db.get_user_galaxy_account(user_id, galaxy_name).await? {
+        if let Some(_) = self
+            .db
+            .get_user_galaxy_account(user_id, galaxy_name)
+            .await?
+        {
             return Err(UserServiceError::UserAlreadyInGalaxy);
         }
 
         // Check if account name is available
-        if !self.db.is_account_name_available(galaxy_name, account_name).await? {
+        if !self
+            .db
+            .is_account_name_available(galaxy_name, account_name)
+            .await?
+        {
             return Err(UserServiceError::AccountNameTaken);
         }
 
         // Create galaxy account
-        let account_id = self.db.create_user_galaxy_account(user_id, galaxy_name, account_name).await?;
+        let account_id = self
+            .db
+            .create_user_galaxy_account(user_id, galaxy_name, account_name)
+            .await?;
 
         // Create a new system for the user using AppState
         let current_tick = crate::tick();
-        let (coords, system_info) = app_state.create_user_system_in_galaxy(galaxy_name, current_tick)
+        let (coords, system_info) = app_state
+            .create_user_system_in_galaxy(galaxy_name, current_tick)
             .await
             .map_err(|e| {
                 if e.contains("full") {
@@ -84,20 +96,26 @@ impl UserService {
             })?;
 
         // Save the system to database with user ownership
-        let system_id = self.db.save_system(
-            galaxy_name,
-            coords.x,
-            coords.y,
-            &system_info.resources,
-            current_tick,
-            Some(account_id),
-        ).await?;
+        let system_id = self
+            .db
+            .save_system(
+                galaxy_name,
+                coords.x,
+                coords.y,
+                &system_info.resources,
+                current_tick,
+                Some(account_id),
+            )
+            .await?;
 
         // Assign the system to the user in the database
         self.db.assign_system_to_user(system_id, account_id).await?;
 
         // Get the created account
-        let account = self.db.get_user_galaxy_account(user_id, galaxy_name).await?
+        let account = self
+            .db
+            .get_user_galaxy_account(user_id, galaxy_name)
+            .await?
             .expect("Account should exist after creation");
 
         Ok((UserGalaxyAccount::from(account), coords))
@@ -109,7 +127,11 @@ impl UserService {
         user_id: i64,
         galaxy_name: &str,
     ) -> Result<Option<UserGalaxyAccount>, UserServiceError> {
-        if let Some(account) = self.db.get_user_galaxy_account(user_id, galaxy_name).await? {
+        if let Some(account) = self
+            .db
+            .get_user_galaxy_account(user_id, galaxy_name)
+            .await?
+        {
             Ok(Some(UserGalaxyAccount::from(account)))
         } else {
             Ok(None)
@@ -131,7 +153,10 @@ impl UserService {
         user_galaxy_account_id: i64,
     ) -> Result<Vec<Coords>, UserServiceError> {
         let systems = self.db.get_user_systems(user_galaxy_account_id).await?;
-        Ok(systems.into_iter().map(|sys| (sys.x as usize, sys.y as usize).into()).collect())
+        Ok(systems
+            .into_iter()
+            .map(|sys| (sys.x as usize, sys.y as usize).into())
+            .collect())
     }
 
     /// Update user's last active time
@@ -140,7 +165,9 @@ impl UserService {
         user_id: i64,
         galaxy_name: &str,
     ) -> Result<(), UserServiceError> {
-        self.db.update_user_galaxy_last_active(user_id, galaxy_name).await?;
+        self.db
+            .update_user_galaxy_last_active(user_id, galaxy_name)
+            .await?;
         Ok(())
     }
 
@@ -150,7 +177,10 @@ impl UserService {
         galaxy_name: &str,
         account_name: &str,
     ) -> Result<bool, UserServiceError> {
-        let available = self.db.is_account_name_available(galaxy_name, account_name).await?;
+        let available = self
+            .db
+            .is_account_name_available(galaxy_name, account_name)
+            .await?;
         Ok(available)
     }
 }

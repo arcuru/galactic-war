@@ -382,12 +382,12 @@ impl Galaxy {
     pub fn create_user_system(&mut self, tick: usize) -> Option<Coords> {
         let mut rng = rand::thread_rng();
         let max_attempts = 1000;
-        
+
         for _ in 0..max_attempts {
             let x: usize = rng.gen_range(0..=self.config.size.x);
             let y: usize = rng.gen_range(0..=self.config.size.y);
             let coords = (x, y).into();
-            
+
             if !self.systems.contains_key(&coords) {
                 // Found an empty location, create a new system
                 let system = System::new(tick, &self.config.systems, &self.config);
@@ -396,7 +396,7 @@ impl Galaxy {
                 return Some(coords);
             }
         }
-        
+
         None // No available location found
     }
 
@@ -414,7 +414,11 @@ impl Galaxy {
 
     /// Get a mutable reference to a specific user system
     #[cfg(feature = "db")]
-    pub fn get_user_system_mut(&mut self, coords: Coords, user_owned_coords: &[Coords]) -> Option<&mut System> {
+    pub fn get_user_system_mut(
+        &mut self,
+        coords: Coords,
+        user_owned_coords: &[Coords],
+    ) -> Option<&mut System> {
         if user_owned_coords.contains(&coords) {
             self.systems.get_mut(&coords)
         } else {
