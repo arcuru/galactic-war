@@ -99,7 +99,6 @@ impl System {
     }
 
     /// Create a system from database data (only available with db feature)
-    #[cfg(feature = "db")]
     pub fn from_database(
         current_tick: usize,
         resources: Resources,
@@ -732,7 +731,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "db")]
+
     fn test_database_persistence_with_tick() {
         let galaxy_config = create_test_galaxy_config();
         let system_config = create_test_system_config();

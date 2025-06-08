@@ -2,8 +2,7 @@ use chrono::{DateTime, Utc};
 
 /// Database row representing an event within a system
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct EventRow {
     pub id: i64,
     pub system_id: i64,
@@ -13,7 +12,6 @@ pub struct EventRow {
     pub created_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl EventRow {
     pub fn new(
         system_id: i64,

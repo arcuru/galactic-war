@@ -1,11 +1,9 @@
-#[cfg(feature = "db")]
 use super::{Database, PersistenceError};
-#[cfg(feature = "db")]
+
 use crate::models::EventRow;
-#[cfg(feature = "db")]
+
 use sqlx::Row;
 
-#[cfg(feature = "db")]
 impl Database {
     /// Save an event to the database
     pub async fn save_event(

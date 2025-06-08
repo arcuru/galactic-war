@@ -14,7 +14,7 @@ name = "galactic-war"
 path = "src/main.rs"
 
 [dependencies]
-galactic-war = { path = "../lib", features = ["db"] }
+galactic-war = { path = "../lib" }
 axum = { version = "0.7", features = ["macros", "form"] }
 axum-extra = { version = "0.9", features = ["cookie"] }
 tokio = { version = "1", features = ["full"] }

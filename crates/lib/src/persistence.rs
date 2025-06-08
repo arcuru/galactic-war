@@ -6,7 +6,6 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::interval;
 
-#[cfg(feature = "db")]
 use crate::db::Database;
 
 /// Configuration for the persistence manager
@@ -37,7 +36,7 @@ impl Default for PersistenceConfig {
 }
 
 /// Manages automatic persistence of galaxy state
-#[cfg(feature = "db")]
+
 #[derive(Debug)]
 pub struct PersistenceManager {
     database: Database,
@@ -47,7 +46,6 @@ pub struct PersistenceManager {
     _shutdown_handle: tokio::task::JoinHandle<()>,
 }
 
-#[cfg(feature = "db")]
 impl PersistenceManager {
     /// Create and start a new persistence manager
     pub async fn new(
@@ -295,36 +293,5 @@ impl PersistenceManager {
                 error_count
             );
         }
-    }
-}
-
-/// No-op persistence manager for when db feature is disabled
-#[cfg(not(feature = "db"))]
-pub struct PersistenceManager;
-
-#[cfg(not(feature = "db"))]
-impl PersistenceManager {
-    pub async fn new(_config: PersistenceConfig) -> Result<Self, ()> {
-        Ok(Self)
-    }
-
-    pub async fn save_all_dirty(&self) -> Result<usize, ()> {
-        Ok(0)
-    }
-
-    pub async fn save_galaxy(&self, _galaxy_name: &str) -> Result<bool, ()> {
-        Ok(false)
-    }
-
-    pub async fn load_galaxy(&self, _galaxy_name: &str) -> Result<bool, ()> {
-        Ok(false)
-    }
-
-    pub async fn galaxy_exists_in_db(&self, _galaxy_name: &str) -> Result<bool, ()> {
-        Ok(false)
-    }
-
-    pub async fn shutdown(&self) -> Result<(), ()> {
-        Ok(())
     }
 }

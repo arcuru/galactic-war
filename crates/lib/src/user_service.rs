@@ -1,5 +1,4 @@
 /// User service that handles galaxy account management and system assignment
-#[cfg(feature = "db")]
 use crate::{
     auth::{AuthError, AuthService},
     db::{Database, PersistenceError},
@@ -10,11 +9,9 @@ use crate::{
 #[derive(Debug, thiserror::Error)]
 pub enum UserServiceError {
     #[error("Authentication error: {0}")]
-    #[cfg(feature = "db")]
     Auth(#[from] AuthError),
 
     #[error("Database error: {0}")]
-    #[cfg(feature = "db")]
     Database(#[from] PersistenceError),
 
     #[error("Galaxy is full, no available coordinates for new system")]
@@ -31,13 +28,11 @@ pub enum UserServiceError {
 }
 
 /// Service for managing users within galaxies
-#[cfg(feature = "db")]
 pub struct UserService {
     auth: AuthService,
     db: Database,
 }
 
-#[cfg(feature = "db")]
 impl UserService {
     /// Create a new user service
     pub fn new(db: Database) -> Self {
@@ -186,7 +181,6 @@ impl UserService {
     }
 }
 
-#[cfg(all(test, feature = "db"))]
 #[allow(dead_code)] // TODO: Update tests to use AppState instead of Galaxy directly
 mod tests {
 

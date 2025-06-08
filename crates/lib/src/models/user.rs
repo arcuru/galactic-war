@@ -2,8 +2,7 @@ use chrono::{DateTime, Utc};
 
 /// Database row representing a server-level user account
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct UserRow {
     pub id: i64,
     pub username: String,
@@ -13,7 +12,6 @@ pub struct UserRow {
     pub updated_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl UserRow {
     pub fn new(username: String, email: String, password_hash: String) -> Self {
         let now = Utc::now();
@@ -30,8 +28,7 @@ impl UserRow {
 
 /// Database row representing a user's account within a specific galaxy
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct UserGalaxyAccountRow {
     pub id: i64,
     pub user_id: i64,
@@ -41,7 +38,6 @@ pub struct UserGalaxyAccountRow {
     pub last_active: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl UserGalaxyAccountRow {
     pub fn new(user_id: i64, galaxy_name: String, account_name: String) -> Self {
         let now = Utc::now();
@@ -62,8 +58,7 @@ impl UserGalaxyAccountRow {
 
 /// Database row representing a user session for authentication
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct UserSessionRow {
     pub id: String, // Session token
     pub user_id: i64,
@@ -71,7 +66,6 @@ pub struct UserSessionRow {
     pub created_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl UserSessionRow {
     pub fn new(session_token: String, user_id: i64, expires_at: DateTime<Utc>) -> Self {
         Self {
@@ -95,7 +89,6 @@ pub struct User {
     pub email: String,
 }
 
-#[cfg(feature = "db")]
 impl From<UserRow> for User {
     fn from(row: UserRow) -> Self {
         Self {
@@ -117,7 +110,6 @@ pub struct UserGalaxyAccount {
     pub last_active: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl From<UserGalaxyAccountRow> for UserGalaxyAccount {
     fn from(row: UserGalaxyAccountRow) -> Self {
         Self {
@@ -139,7 +131,6 @@ pub struct UserSession {
     pub expires_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl From<UserSessionRow> for UserSession {
     fn from(row: UserSessionRow) -> Self {
         Self {

@@ -2,8 +2,7 @@ use chrono::{DateTime, Utc};
 
 /// Database row representing a system within a galaxy
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct SystemRow {
     pub id: i64,
     pub galaxy_name: String,
@@ -18,7 +17,6 @@ pub struct SystemRow {
     pub updated_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl SystemRow {
     pub fn new(
         galaxy_name: String,
@@ -58,8 +56,7 @@ impl SystemRow {
 
 /// Database row representing a structure within a system
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct StructureRow {
     pub id: i64,
     pub system_id: i64,
@@ -69,7 +66,6 @@ pub struct StructureRow {
     pub updated_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl StructureRow {
     pub fn new(system_id: i64, structure_type: String, level: usize) -> Self {
         let now = Utc::now();

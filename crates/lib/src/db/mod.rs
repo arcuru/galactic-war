@@ -1,6 +1,5 @@
 use std::env;
 
-#[cfg(feature = "db")]
 use sqlx::{Pool, Sqlite, SqlitePool};
 
 pub mod events;
@@ -10,7 +9,7 @@ pub mod systems;
 pub mod users;
 
 // Error types for database operations
-#[cfg(feature = "db")]
+
 #[derive(Debug, thiserror::Error)]
 pub enum PersistenceError {
     #[error("Database error: {0}")]
@@ -30,13 +29,12 @@ pub enum PersistenceError {
 }
 
 /// Database connection manager
-#[cfg(feature = "db")]
+
 #[derive(Clone, Debug)]
 pub struct Database {
     pool: Pool<Sqlite>,
 }
 
-#[cfg(feature = "db")]
 impl Database {
     /// Create a new database connection with migrations
     pub async fn new() -> Result<Self, PersistenceError> {
@@ -111,7 +109,6 @@ impl Database {
     }
 }
 
-#[cfg(all(test, feature = "db"))]
 mod tests {
     use super::*;
     use sqlx::Row;

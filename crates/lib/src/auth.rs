@@ -2,13 +2,11 @@ use argon2::password_hash::{rand_core::OsRng, SaltString};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::{DateTime, Duration, Utc};
 
-#[cfg(feature = "db")]
 use crate::db::{Database, PersistenceError};
-#[cfg(feature = "db")]
+
 use crate::models::{User, UserSession};
 
 /// Authentication service for user management
-#[cfg(feature = "db")]
 pub struct AuthService {
     db: Database,
 }
@@ -31,14 +29,12 @@ pub enum AuthError {
     InvalidSessionToken,
 
     #[error("Database error: {0}")]
-    #[cfg(feature = "db")]
     Database(#[from] PersistenceError),
 
     #[error("Password hashing error")]
     PasswordHashing,
 }
 
-#[cfg(feature = "db")]
 impl AuthService {
     /// Create a new auth service with database connection
     pub fn new(db: Database) -> Self {
@@ -224,10 +220,10 @@ pub struct AuthResponse {
     pub expires_at: DateTime<Utc>,
 }
 
-#[cfg(all(test, feature = "db"))]
 mod tests {
     use super::*;
-    use crate::db::Database;
+    use crate::{Database, AuthService, AuthError};
+    use chrono::{Duration, Utc};
 
     #[tokio::test]
     async fn test_password_hashing() {

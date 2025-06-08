@@ -1,11 +1,9 @@
-#[cfg(feature = "db")]
 use super::{Database, PersistenceError};
-#[cfg(feature = "db")]
+
 use crate::models::StructureRow;
-#[cfg(feature = "db")]
+
 use sqlx::Row;
 
-#[cfg(feature = "db")]
 impl Database {
     /// Save or update a structure for a system
     pub async fn save_structure(

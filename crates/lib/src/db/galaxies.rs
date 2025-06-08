@@ -1,17 +1,15 @@
-#[cfg(feature = "db")]
 use super::{Database, PersistenceError};
-#[cfg(feature = "db")]
+
 use crate::models::GalaxyRow;
-#[cfg(feature = "db")]
+
 use crate::{Coords, Event, EventCallback, Galaxy, GalaxyConfig, StructureType, System};
-#[cfg(feature = "db")]
+
 use sqlx::Row;
-#[cfg(feature = "db")]
+
 use std::collections::HashMap;
-#[cfg(feature = "db")]
+
 use std::str::FromStr;
 
-#[cfg(feature = "db")]
 impl Database {
     /// Check if a galaxy exists in the database
     pub async fn galaxy_exists(&self, galaxy_name: &str) -> Result<bool, PersistenceError> {
@@ -349,9 +347,9 @@ impl Database {
     }
 }
 
-#[cfg(all(test, feature = "db"))]
 mod tests {
     use super::*;
+    use crate::{Database, GalaxyConfig};
 
     #[tokio::test]
     async fn test_galaxy_crud_operations() {

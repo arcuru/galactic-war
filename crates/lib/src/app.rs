@@ -1,6 +1,5 @@
 use crate::{config::GalaxyConfig, Coords, Details, Event, Galaxy, SystemInfo};
 
-#[cfg(feature = "db")]
 use crate::{
     app_config::AppConfig,
     db::Database,
@@ -9,12 +8,12 @@ use crate::{
 
 use std::collections::HashMap;
 use std::sync::Arc;
+
 use tokio::sync::Mutex;
 
 /// Application state manager that coordinates between in-memory state and persistence
 #[derive(Debug)]
 pub struct AppState {
-    #[cfg(feature = "db")]
     persistence_manager: Option<PersistenceManager>,
     /// Galaxy storage
     galaxies: Arc<Mutex<HashMap<String, Galaxy>>>,
@@ -31,79 +30,58 @@ impl AppState {
         config_path: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let galaxies = Arc::new(Mutex::new(HashMap::new()));
+        let app_config = AppConfig::load_from_file_and_env(config_path)?;
 
-        #[cfg(feature = "db")]
-        {
-            let app_config = AppConfig::load_from_file_and_env(config_path)?;
+        if app_config.persistence.enabled {
+            log::info!("Initializing with database persistence");
 
-            if app_config.persistence.enabled {
-                log::info!("Initializing with database persistence");
+            // Create database connection
+            let database = Database::new().await?;
 
-                // Create database connection
-                let database = Database::new().await?;
+            // Configure persistence settings from unified config
+            let config = PersistenceConfig {
+                auto_save_interval: app_config.persistence.auto_save_interval,
+                shutdown_timeout: app_config.persistence.shutdown_timeout,
+                enabled: app_config.persistence.enabled,
+                write_coalescing: app_config.persistence.write_coalescing,
+                coalescing_delay_ms: app_config.persistence.coalescing_delay_ms,
+            };
 
-                // Configure persistence settings from unified config
-                let config = PersistenceConfig {
-                    auto_save_interval: app_config.persistence.auto_save_interval,
-                    shutdown_timeout: app_config.persistence.shutdown_timeout,
-                    enabled: app_config.persistence.enabled,
-                    write_coalescing: app_config.persistence.write_coalescing,
-                    coalescing_delay_ms: app_config.persistence.coalescing_delay_ms,
-                };
+            log::info!("Persistence config: auto_save_interval={}s, write_coalescing={}, coalescing_delay={}ms", 
+                config.auto_save_interval, config.write_coalescing, config.coalescing_delay_ms);
 
-                log::info!("Persistence config: auto_save_interval={}s, write_coalescing={}, coalescing_delay={}ms", 
-                    config.auto_save_interval, config.write_coalescing, config.coalescing_delay_ms);
+            // Create persistence manager with weak reference to galaxies
+            let galaxies_weak = Arc::downgrade(&galaxies);
+            let persistence_manager =
+                PersistenceManager::new(database, config, galaxies_weak).await?;
 
-                // Create persistence manager with weak reference to galaxies
-                let galaxies_weak = Arc::downgrade(&galaxies);
-                let persistence_manager =
-                    PersistenceManager::new(database, config, galaxies_weak).await?;
+            let app_state = Self {
+                persistence_manager: Some(persistence_manager),
+                galaxies,
+            };
 
-                let app_state = Self {
-                    persistence_manager: Some(persistence_manager),
-                    galaxies,
-                };
-
-                // Load all existing galaxies at startup
-                if let Err(e) = app_state.load_all_galaxies().await {
-                    log::error!("Failed to load galaxies at startup: {}", e);
-                }
-
-                Ok(app_state)
-            } else {
-                log::info!("Persistence disabled via configuration");
-                Ok(Self {
-                    persistence_manager: None,
-                    galaxies,
-                })
+            // Load all existing galaxies at startup
+            if let Err(e) = app_state.load_all_galaxies().await {
+                log::error!("Failed to load galaxies at startup: {}", e);
             }
-        }
 
-        #[cfg(not(feature = "db"))]
-        {
-            let _ = config_path; // Suppress unused variable warning
-            log::info!("Database persistence not available (compiled without 'db' feature)");
-            Ok(Self { galaxies })
+            Ok(app_state)
+        } else {
+            log::info!("Persistence disabled via configuration");
+            Ok(Self {
+                persistence_manager: None,
+                galaxies,
+            })
         }
     }
 
     /// Create a test instance without persistence (for testing)
     #[cfg(test)]
     pub async fn new_test() -> Result<Self, Box<dyn std::error::Error>> {
-        #[cfg(feature = "db")]
-        {
-            Ok(Self {
-                persistence_manager: None,
-                galaxies: Arc::new(Mutex::new(HashMap::new())),
-            })
-        }
-
-        #[cfg(not(feature = "db"))]
-        {
-            Ok(Self {
-                galaxies: Arc::new(Mutex::new(HashMap::new())),
-            })
-        }
+        Ok(Self {
+            persistence_manager: None,
+            galaxies: Arc::new(Mutex::new(HashMap::new())),
+        })
     }
 
     /// Create a new galaxy
@@ -123,7 +101,6 @@ impl AppState {
             return Err(format!("Galaxy {} already exists in memory", galaxy_name));
         }
 
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             // Check if galaxy exists in database
             match pm.galaxy_exists_in_db(galaxy_name).await {
@@ -181,7 +158,6 @@ impl AppState {
             galaxies.insert(galaxy_name.to_string(), galaxy);
         }
 
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             // Save initial state to database - we need to clone the galaxy to avoid holding lock across await
             let galaxy_clone = {
@@ -215,7 +191,6 @@ impl AppState {
             }
         }
 
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             // Try to load from database
             match pm.load_galaxy(galaxy_name).await {
@@ -238,12 +213,6 @@ impl AppState {
                 galaxy_name
             ))
         }
-
-        #[cfg(not(feature = "db"))]
-        Err(format!(
-            "Galaxy '{}' not found and persistence not available",
-            galaxy_name
-        ))
     }
 
     /// Build a structure with auto-persistence
@@ -285,7 +254,6 @@ impl AppState {
 
     /// Manually save all dirty galaxies
     pub async fn save_all(&self) -> Result<usize, String> {
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             let result = {
                 let mut galaxies = self.galaxies.lock().await;
@@ -301,9 +269,6 @@ impl AppState {
         } else {
             Ok(0)
         }
-
-        #[cfg(not(feature = "db"))]
-        Ok(0)
     }
 
     /// List all galaxies (from memory and database)
@@ -316,7 +281,6 @@ impl AppState {
             galaxies.extend(memory_galaxies.keys().cloned());
         }
 
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             // Get galaxies from database
             match pm.database().list_galaxy_names().await {
@@ -337,7 +301,6 @@ impl AppState {
 
     /// Load all existing galaxies from database into memory
     async fn load_all_galaxies(&self) -> Result<(), String> {
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             // Get list of all galaxy names from database
             let galaxy_names = match pm.database().list_galaxy_names().await {
@@ -382,12 +345,6 @@ impl AppState {
             log::debug!("No persistence manager available, skipping galaxy loading");
             Ok(())
         }
-
-        #[cfg(not(feature = "db"))]
-        {
-            log::debug!("Database persistence not available, skipping galaxy loading");
-            Ok(())
-        }
     }
 
     /// Ensure a galaxy is loaded into memory
@@ -400,7 +357,6 @@ impl AppState {
             }
         }
 
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             // Try to load from database
             match pm.load_galaxy(galaxy_name).await {
@@ -415,21 +371,14 @@ impl AppState {
         } else {
             Err(format!("Galaxy '{}' not found in memory", galaxy_name))
         }
-
-        #[cfg(not(feature = "db"))]
-        Err(format!("Galaxy '{}' not found in memory", galaxy_name))
     }
 
     /// Gracefully shutdown the application
     pub async fn shutdown(self) -> Result<(), Box<dyn std::error::Error>> {
-        #[cfg(feature = "db")]
         if let Some(persistence_manager) = self.persistence_manager {
             log::info!("Shutting down persistence manager...");
             persistence_manager.shutdown().await?;
         }
-
-        #[cfg(not(feature = "db"))]
-        log::info!("No persistence to shut down");
 
         Ok(())
     }
@@ -439,7 +388,6 @@ impl AppState {
         // Save all dirty galaxies first
         self.save_all().await?;
 
-        #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
             log::info!("Shutting down persistence manager...");
             if let Err(e) = pm.shutdown().await {
@@ -447,9 +395,6 @@ impl AppState {
                 return Err(format!("Persistence shutdown error: {}", e));
             }
         }
-
-        #[cfg(not(feature = "db"))]
-        log::info!("No persistence to shut down");
 
         Ok(())
     }
@@ -471,13 +416,11 @@ impl AppState {
     }
 
     /// Get a reference to the database (if persistence is enabled)
-    #[cfg(feature = "db")]
     pub fn database(&self) -> Option<&Database> {
         self.persistence_manager.as_ref().map(|pm| pm.database())
     }
 
     /// Create a user system in a galaxy safely without holding locks across awaits
-    #[cfg(feature = "db")]
     pub async fn create_user_system_in_galaxy(
         &self,
         galaxy_name: &str,

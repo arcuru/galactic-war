@@ -2,8 +2,7 @@ use chrono::{DateTime, Utc};
 
 /// Database row representing a galaxy
 #[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "db")]
-#[cfg_attr(feature = "db", derive(sqlx::FromRow))]
+#[derive(sqlx::FromRow)]
 pub struct GalaxyRow {
     pub name: String,
     pub config_file: String,
@@ -12,7 +11,6 @@ pub struct GalaxyRow {
     pub updated_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "db")]
 impl GalaxyRow {
     pub fn new(name: String, config_file: String, tick: usize) -> Self {
         let now = Utc::now();

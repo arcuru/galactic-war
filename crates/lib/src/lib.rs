@@ -9,15 +9,10 @@ pub mod config;
 mod game_system;
 
 // Database and models modules
-#[cfg(feature = "db")]
 pub mod auth;
-#[cfg(feature = "db")]
 pub mod db;
-#[cfg(feature = "db")]
 pub mod models;
-#[cfg(feature = "db")]
 pub mod persistence;
-#[cfg(feature = "db")]
 pub mod user_service;
 
 use crate::config::GalaxyConfig;
@@ -27,14 +22,10 @@ pub use crate::app::AppState;
 pub use crate::app_config::AppConfig;
 pub use crate::game_system::{Event, EventCallback, StructureType};
 
-// Re-export database types when db feature is enabled
-#[cfg(feature = "db")]
+// Re-export database types
 pub use crate::auth::*;
-#[cfg(feature = "db")]
 pub use crate::db::{Database, PersistenceError};
-#[cfg(feature = "db")]
 pub use crate::models::*;
-#[cfg(feature = "db")]
 pub use crate::user_service::*;
 
 /// Return the current second since the Unix epoch
@@ -59,11 +50,9 @@ pub struct Galaxy {
     tick: usize,
 
     /// Track which systems have changed and need database persistence
-    #[cfg(feature = "db")]
     dirty_systems: std::collections::HashSet<Coords>,
 
     /// Flag indicating if the galaxy needs to be persisted
-    #[cfg(feature = "db")]
     needs_persist: bool,
 }
 
@@ -233,9 +222,9 @@ impl Galaxy {
             config,
             systems,
             tick: initial_tick,
-            #[cfg(feature = "db")]
+
             dirty_systems: std::collections::HashSet::new(),
-            #[cfg(feature = "db")]
+
             needs_persist: false,
         }
     }
@@ -254,7 +243,7 @@ impl Galaxy {
         let result = system.get_details(tick, &self.config, structure);
 
         // Mark dirty if tick changed (indicates event processing occurred)
-        #[cfg(feature = "db")]
+
         if self.tick != _old_tick {
             self.mark_system_dirty(coords);
         }
@@ -283,7 +272,7 @@ impl Galaxy {
         }
 
         // Mark all systems dirty if tick changed
-        #[cfg(feature = "db")]
+
         if self.tick != _old_tick {
             let coords: Vec<_> = self.systems.keys().cloned().collect();
             for coord in coords {
@@ -315,7 +304,7 @@ impl Galaxy {
         let result = system.build(tick, &self.config, structure);
 
         // Mark for persistence on successful build
-        #[cfg(feature = "db")]
+
         if result.is_ok() {
             self.mark_system_dirty(coords);
         }
@@ -333,29 +322,24 @@ impl Galaxy {
     }
 
     /// Change tracking methods (only available with db feature)
-    #[cfg(feature = "db")]
     pub fn mark_system_dirty(&mut self, coords: Coords) {
         self.dirty_systems.insert(coords);
         self.needs_persist = true;
     }
 
-    #[cfg(feature = "db")]
     pub fn get_dirty_systems(&self) -> &std::collections::HashSet<Coords> {
         &self.dirty_systems
     }
 
-    #[cfg(feature = "db")]
     pub fn needs_persist(&self) -> bool {
         self.needs_persist
     }
 
-    #[cfg(feature = "db")]
     pub fn clear_dirty_flag(&mut self) {
         self.dirty_systems.clear();
         self.needs_persist = false;
     }
 
-    #[cfg(feature = "db")]
     pub fn mark_all_dirty(&mut self) {
         let coords: Vec<_> = self.systems.keys().cloned().collect();
         for coord in coords {
@@ -365,20 +349,17 @@ impl Galaxy {
     }
 
     /// Replace the systems HashMap (used when loading from database)
-    #[cfg(feature = "db")]
     pub fn replace_systems(&mut self, systems: HashMap<Coords, System>) {
         self.systems = systems;
         self.clear_dirty_flag();
     }
 
     /// Get the current tick for database operations
-    #[cfg(feature = "db")]
     pub fn get_tick(&self) -> usize {
         self.tick
     }
 
     /// Create a new system for a user at a random available location
-    #[cfg(feature = "db")]
     pub fn create_user_system(&mut self, tick: usize) -> Option<Coords> {
         let mut rng = rand::thread_rng();
         let max_attempts = 1000;
@@ -401,7 +382,6 @@ impl Galaxy {
     }
 
     /// Get all systems owned by a specific user (via coordinates)
-    #[cfg(feature = "db")]
     pub fn get_user_systems(&self, user_owned_coords: &[Coords]) -> HashMap<Coords, &System> {
         let mut user_systems = HashMap::new();
         for &coords in user_owned_coords {
@@ -413,7 +393,6 @@ impl Galaxy {
     }
 
     /// Get a mutable reference to a specific user system
-    #[cfg(feature = "db")]
     pub fn get_user_system_mut(
         &mut self,
         coords: Coords,
@@ -427,7 +406,6 @@ impl Galaxy {
     }
 
     /// Check if a user can access a specific system
-    #[cfg(feature = "db")]
     pub fn can_user_access_system(&self, coords: Coords, user_owned_coords: &[Coords]) -> bool {
         user_owned_coords.contains(&coords)
     }

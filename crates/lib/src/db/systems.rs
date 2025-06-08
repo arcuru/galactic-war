@@ -1,11 +1,9 @@
-#[cfg(feature = "db")]
 use super::{Database, PersistenceError};
-#[cfg(feature = "db")]
+
 use crate::models::SystemRow;
-#[cfg(feature = "db")]
+
 use sqlx::Row;
 
-#[cfg(feature = "db")]
 impl Database {
     /// Create or update a system in the database
     pub async fn save_system(
@@ -191,10 +189,10 @@ impl Database {
     }
 }
 
-#[cfg(all(test, feature = "db"))]
 mod tests {
-    use super::*;
+    use crate::Database;
 
+    #[allow(dead_code)]
     async fn setup_test_galaxy(db: &Database, galaxy_name: &str) {
         db.create_galaxy(galaxy_name, "test_config", 0)
             .await

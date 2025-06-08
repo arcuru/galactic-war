@@ -17,19 +17,15 @@ serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 log = "0.4"
 
-# Database persistence dependencies
+# Database persistence dependencies (now always included)
 sqlx = { version = "0.7", features = [
     "runtime-tokio-rustls",
     "sqlite",
     "chrono",
     "migrate",
-], optional = true }
-chrono = { version = "0.4", features = ["serde"], optional = true }
-serde_json = { version = "1.0", optional = true }
-thiserror = { version = "1.0", optional = true }
-tokio = { version = "1", features = ["full"], optional = true }
-argon2 = { version = "0.5", optional = true }
-
-[features]
-default = []
-db = ["sqlx", "chrono", "serde_json", "thiserror", "tokio", "argon2"]
+] }
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = { version = "1.0" }
+thiserror = { version = "1.0" }
+tokio = { version = "1", features = ["full"] }
+argon2 = { version = "0.5" }

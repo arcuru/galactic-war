@@ -1,13 +1,11 @@
-#[cfg(feature = "db")]
 use super::{Database, PersistenceError};
-#[cfg(feature = "db")]
+
 use crate::models::{UserGalaxyAccountRow, UserRow, UserSessionRow};
-#[cfg(feature = "db")]
+
 use chrono::{DateTime, Utc};
-#[cfg(feature = "db")]
+
 use sqlx::Row;
 
-#[cfg(feature = "db")]
 impl Database {
     /// Create a new user account
     pub async fn create_user(
@@ -277,11 +275,12 @@ impl Database {
     }
 }
 
-#[cfg(all(test, feature = "db"))]
 mod tests {
     use super::*;
-    use chrono::Duration;
+    use crate::Database;
+    use chrono::{Duration, Utc};
 
+    #[allow(dead_code)]
     async fn setup_test_galaxy(db: &Database, galaxy_name: &str) {
         db.create_galaxy(galaxy_name, "test_config", 0)
             .await
