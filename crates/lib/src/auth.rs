@@ -220,8 +220,8 @@ pub struct AuthResponse {
     pub expires_at: DateTime<Utc>,
 }
 
+#[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{Database, AuthService, AuthError};
     use chrono::{Duration, Utc};
 

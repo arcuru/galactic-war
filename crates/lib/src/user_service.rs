@@ -182,6 +182,7 @@ impl UserService {
 }
 
 #[allow(dead_code)] // TODO: Update tests to use AppState instead of Galaxy directly
+#[cfg(test)]
 mod tests {
 
     use crate::Database;
