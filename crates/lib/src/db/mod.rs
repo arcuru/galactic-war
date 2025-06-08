@@ -42,7 +42,40 @@ impl Database {
         let database_url =
             env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:galactic_war.db".to_string());
 
-        let pool = SqlitePool::connect(&database_url).await?;
+        // Create the database directory if it doesn't exist
+        if database_url.starts_with("sqlite:") && !database_url.contains(":memory:") {
+            let db_path = database_url
+                .strip_prefix("sqlite:")
+                .unwrap_or(&database_url);
+            let path = std::path::Path::new(db_path);
+
+            // Create parent directory if it exists
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    PersistenceError::Migration(format!(
+                        "Failed to create database directory: {}",
+                        e
+                    ))
+                })?;
+            }
+
+            // SQLite will create the file automatically when connecting, but we need to ensure
+            // the connection string uses the create_if_missing option
+        }
+
+        // Use connect_with to ensure the database file is created
+        let pool = if database_url.starts_with("sqlite:") && !database_url.contains(":memory:") {
+            use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
+            use std::str::FromStr;
+
+            let options = SqliteConnectOptions::from_str(&database_url)?
+                .create_if_missing(true)
+                .journal_mode(SqliteJournalMode::Wal);
+
+            SqlitePool::connect_with(options).await?
+        } else {
+            SqlitePool::connect(&database_url).await?
+        };
 
         // Run migrations
         sqlx::migrate!("./migrations")
