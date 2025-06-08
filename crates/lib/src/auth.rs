@@ -77,11 +77,11 @@ impl AuthService {
         password: &str,
     ) -> Result<User, AuthError> {
         // Check if username or email already exists
-        if let Some(_) = self.db.get_user_by_username(username).await? {
+        if (self.db.get_user_by_username(username).await?).is_some() {
             return Err(AuthError::UserAlreadyExists);
         }
 
-        if let Some(_) = self.db.get_user_by_email(email).await? {
+        if (self.db.get_user_by_email(email).await?).is_some() {
             return Err(AuthError::UserAlreadyExists);
         }
 

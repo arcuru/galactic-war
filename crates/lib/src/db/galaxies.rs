@@ -353,12 +353,6 @@ impl Database {
 mod tests {
     use super::*;
 
-    async fn setup_test_galaxy(db: &Database, galaxy_name: &str) {
-        db.create_galaxy(galaxy_name, "test_config", 0)
-            .await
-            .expect("Failed to create test galaxy");
-    }
-
     #[tokio::test]
     async fn test_galaxy_crud_operations() {
         let db = Database::new_test()

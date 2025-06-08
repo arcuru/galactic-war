@@ -22,11 +22,8 @@ pub struct SystemRow {
 impl SystemRow {
     pub fn new(
         galaxy_name: String,
-        x: usize,
-        y: usize,
-        metal: usize,
-        crew: usize,
-        water: usize,
+        coords: crate::Coords,
+        resources: crate::Resources,
         current_tick: usize,
         user_galaxy_account_id: Option<i64>,
     ) -> Self {
@@ -34,11 +31,11 @@ impl SystemRow {
         Self {
             id: 0, // Will be set by database
             galaxy_name,
-            x: x as i64,
-            y: y as i64,
-            metal: metal as i64,
-            crew: crew as i64,
-            water: water as i64,
+            x: coords.x as i64,
+            y: coords.y as i64,
+            metal: resources.metal as i64,
+            crew: resources.crew as i64,
+            water: resources.water as i64,
             current_tick: current_tick as i64,
             user_galaxy_account_id,
             created_at: now,

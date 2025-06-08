@@ -1,8 +1,9 @@
 use crate::Galaxy;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
+use tokio::sync::Mutex;
 use tokio::time::interval;
 
 #[cfg(feature = "db")]
@@ -156,8 +157,11 @@ impl PersistenceManager {
         // Try to save all dirty galaxies one last time
         let timeout = Duration::from_secs(self.config.shutdown_timeout);
         if let Some(galaxies_arc) = self.galaxies.upgrade() {
-            let mut galaxies = galaxies_arc.lock().unwrap();
-            match tokio::time::timeout(timeout, self.save_all_dirty(&mut galaxies)).await {
+            let result = {
+                let mut galaxies = galaxies_arc.lock().await;
+                tokio::time::timeout(timeout, self.save_all_dirty(&mut galaxies)).await
+            };
+            match result {
                 Ok(Ok(count)) => {
                     log::info!("Saved {} galaxies during shutdown", count);
                 }
@@ -204,7 +208,7 @@ impl PersistenceManager {
 
                     // Get list of dirty galaxies
                     let dirty_galaxies = {
-                        let galaxies = galaxies_arc.lock().unwrap();
+                        let galaxies = galaxies_arc.lock().await;
                         galaxies
                             .iter()
                             .filter(|(_, g)| g.needs_persist())
@@ -262,14 +266,14 @@ impl PersistenceManager {
 
         for galaxy_name in galaxy_names {
             let galaxy_to_save = {
-                let galaxies = galaxies_arc.lock().unwrap();
+                let galaxies = galaxies_arc.lock().await;
                 galaxies.get(&galaxy_name).cloned() // Clone to release the lock
             };
 
             if let Some(galaxy) = galaxy_to_save {
                 match database.save_galaxy_state(&galaxy_name, &galaxy).await {
                     Ok(_) => {
-                        let mut galaxies = galaxies_arc.lock().unwrap();
+                        let mut galaxies = galaxies_arc.lock().await;
                         if let Some(g) = galaxies.get_mut(&galaxy_name) {
                             g.clear_dirty_flag();
                         }

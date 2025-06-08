@@ -68,7 +68,7 @@ impl GalacticWeb {
     }
 
     /// Return the full HTML page.
-    pub fn get(&self) -> Result<Html<String>, String> {
+    pub async fn get(&self) -> Result<Html<String>, String> {
         let mut page: String = r#"
 <head>
     <title>Galactic War</title>
@@ -90,7 +90,10 @@ impl GalacticWeb {
         .to_string();
         page.push_str(&self.get_linkback());
         page.push_str("<br><br>");
-        let system_info = self.app_state.system_info_sync(&self.galaxy, self.coords)?;
+        let system_info = self
+            .app_state
+            .system_info(&self.galaxy, self.coords)
+            .await?;
         page.push_str(&resource_table(
             &system_info.resources,
             &system_info.production,

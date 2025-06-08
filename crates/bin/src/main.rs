@@ -352,7 +352,7 @@ async fn system_build(
     }
 
     page.add("</table>");
-    page.get()
+    page.get().await
 }
 
 /// Handler for GET requests to /:galaxy/:x/:y/:structure
@@ -374,7 +374,7 @@ async fn structure_get(
             }
         };
         {
-            let galaxies = app_state.galaxies().lock().unwrap();
+            let galaxies = app_state.galaxies().lock().await;
             if let Some(galaxy_obj) = galaxies.get(&galaxy) {
                 let config = galaxy_obj.get_config();
                 if let Some(structure_config) = config.systems.structures.get(&structure) {
@@ -407,7 +407,7 @@ async fn structure_get(
             }
         }
         // This locks the galaxy, so we need to drop the previous lock
-        page.get()
+        page.get().await
     } else {
         Err(dets.unwrap_err())
     }
@@ -460,7 +460,7 @@ async fn system_get(
         galaxy, x, y
     ));
 
-    page.get()
+    page.get().await
 }
 
 /// Handler for GET requests to /:galaxy/stats
@@ -535,7 +535,7 @@ async fn galaxy_info(
 
     // First, get all the addresses
     let addresses = {
-        let galaxies = app_state.galaxies().lock().unwrap();
+        let galaxies = app_state.galaxies().lock().await;
         if let Some(galaxy) = galaxies.get(galaxy_name) {
             galaxy.systems().keys().cloned().collect::<Vec<_>>()
         } else {

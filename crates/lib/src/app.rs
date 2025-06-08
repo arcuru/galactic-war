@@ -8,7 +8,8 @@ use crate::{
 };
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Application state manager that coordinates between in-memory state and persistence
 #[derive(Debug)]
@@ -114,7 +115,7 @@ impl AppState {
     ) -> Result<String, String> {
         // Check if galaxy already exists in memory
         let galaxy_exists = {
-            let galaxies = self.galaxies.lock().unwrap();
+            let galaxies = self.galaxies.lock().await;
             galaxies.contains_key(galaxy_name)
         };
 
@@ -131,7 +132,7 @@ impl AppState {
                     match pm.load_galaxy(galaxy_name).await {
                         Ok(Some(galaxy)) => {
                             {
-                                let mut galaxies = self.galaxies.lock().unwrap();
+                                let mut galaxies = self.galaxies.lock().await;
                                 galaxies.insert(galaxy_name.to_string(), galaxy);
                             }
                             return Ok(format!("Galaxy {} loaded from database", galaxy_name));
@@ -176,7 +177,7 @@ impl AppState {
         let galaxy = Galaxy::new(config.clone(), initial_tick);
 
         {
-            let mut galaxies = self.galaxies.lock().unwrap();
+            let mut galaxies = self.galaxies.lock().await;
             galaxies.insert(galaxy_name.to_string(), galaxy);
         }
 
@@ -184,7 +185,7 @@ impl AppState {
         if let Some(ref pm) = self.persistence_manager {
             // Save initial state to database - we need to clone the galaxy to avoid holding lock across await
             let galaxy_clone = {
-                let galaxies = self.galaxies.lock().unwrap();
+                let galaxies = self.galaxies.lock().await;
                 galaxies.get(galaxy_name).cloned()
             };
 
@@ -208,7 +209,7 @@ impl AppState {
     ) -> Result<Details, String> {
         // Try to get from memory first
         {
-            let mut galaxies = self.galaxies.lock().unwrap();
+            let mut galaxies = self.galaxies.lock().await;
             if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
                 return galaxy.get_details(tick, coords, structure);
             }
@@ -219,7 +220,7 @@ impl AppState {
             // Try to load from database
             match pm.load_galaxy(galaxy_name).await {
                 Ok(Some(galaxy)) => {
-                    let mut galaxies = self.galaxies.lock().unwrap();
+                    let mut galaxies = self.galaxies.lock().await;
                     galaxies.insert(galaxy_name.to_string(), galaxy);
                     // Now try again to get the details
                     if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
@@ -257,7 +258,7 @@ impl AppState {
         self.ensure_galaxy_loaded(galaxy_name).await?;
 
         let result = {
-            let mut galaxies = self.galaxies.lock().unwrap();
+            let mut galaxies = self.galaxies.lock().await;
             if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
                 galaxy.build(tick, coords, structure)
             } else {
@@ -274,7 +275,7 @@ impl AppState {
         // Ensure galaxy is loaded
         self.ensure_galaxy_loaded(galaxy_name).await?;
 
-        let mut galaxies = self.galaxies.lock().unwrap();
+        let mut galaxies = self.galaxies.lock().await;
         if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
             galaxy.stats(tick)
         } else {
@@ -286,8 +287,11 @@ impl AppState {
     pub async fn save_all(&self) -> Result<usize, String> {
         #[cfg(feature = "db")]
         if let Some(ref pm) = self.persistence_manager {
-            let mut galaxies = self.galaxies.lock().unwrap();
-            match pm.save_all_dirty(&mut galaxies).await {
+            let result = {
+                let mut galaxies = self.galaxies.lock().await;
+                pm.save_all_dirty(&mut galaxies).await
+            };
+            match result {
                 Ok(count) => {
                     log::info!("Manually saved {} galaxies", count);
                     Ok(count)
@@ -308,7 +312,7 @@ impl AppState {
 
         // Get galaxies from memory
         {
-            let memory_galaxies = self.galaxies.lock().unwrap();
+            let memory_galaxies = self.galaxies.lock().await;
             galaxies.extend(memory_galaxies.keys().cloned());
         }
 
@@ -351,7 +355,7 @@ impl AppState {
             for galaxy_name in galaxy_names {
                 match pm.load_galaxy(&galaxy_name).await {
                     Ok(Some(galaxy)) => {
-                        let mut galaxies = self.galaxies.lock().unwrap();
+                        let mut galaxies = self.galaxies.lock().await;
                         galaxies.insert(galaxy_name.clone(), galaxy);
                         loaded_count += 1;
                         log::debug!("Loaded galaxy: {}", galaxy_name);
@@ -390,7 +394,7 @@ impl AppState {
     async fn ensure_galaxy_loaded(&self, galaxy_name: &str) -> Result<(), String> {
         // Check if already in memory
         {
-            let galaxies = self.galaxies.lock().unwrap();
+            let galaxies = self.galaxies.lock().await;
             if galaxies.contains_key(galaxy_name) {
                 return Ok(());
             }
@@ -401,7 +405,7 @@ impl AppState {
             // Try to load from database
             match pm.load_galaxy(galaxy_name).await {
                 Ok(Some(galaxy)) => {
-                    let mut galaxies = self.galaxies.lock().unwrap();
+                    let mut galaxies = self.galaxies.lock().await;
                     galaxies.insert(galaxy_name.to_string(), galaxy);
                     Ok(())
                 }
@@ -450,7 +454,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Retrieve the details of a system (async version)
+    /// Retrieve the details of a system
     pub async fn system_info(&self, galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
         let dets = self
             .get_galaxy_details(galaxy, crate::tick(), coords, None)
@@ -458,24 +462,6 @@ impl AppState {
         match dets {
             Details::System(info) => Ok(info),
             _ => Err("Unexpected Details type".to_string()),
-        }
-    }
-
-    /// Retrieve the details of a system (synchronous version for web interface)
-    pub fn system_info_sync(&self, galaxy: &str, coords: Coords) -> Result<SystemInfo, String> {
-        let mut galaxies = self.galaxies.lock().unwrap();
-        if let Some(galaxy) = galaxies.get_mut(galaxy) {
-            let dets = galaxy.get_details(crate::tick(), coords, None);
-            if let Ok(dets) = dets {
-                match dets {
-                    Details::System(info) => Ok(info),
-                    _ => Err("Unexpected Details type".to_string()),
-                }
-            } else {
-                Err(dets.unwrap_err())
-            }
-        } else {
-            Err("Galaxy not found".to_string())
         }
     }
 
@@ -499,7 +485,7 @@ impl AppState {
     ) -> Result<(Coords, SystemInfo), String> {
         // First, try to find available coordinates and create the system
         let (coords, system_info) = {
-            let mut galaxies = self.galaxies.lock().unwrap();
+            let mut galaxies = self.galaxies.lock().await;
             if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
                 if let Some(coords) = galaxy.create_user_system(tick) {
                     // Get galaxy config first (immutable borrow)
@@ -579,7 +565,7 @@ mod tests {
 
         // Get a valid coordinate by checking the galaxy's systems
         let coords = {
-            let galaxies = app_state.galaxies.lock().unwrap();
+            let galaxies = app_state.galaxies.lock().await;
             let galaxy = galaxies.get("ops_test").unwrap();
             *galaxy.systems().keys().next().unwrap()
         };
@@ -630,7 +616,7 @@ mod tests {
 
         // Verify both galaxies are in memory
         {
-            let galaxies = app_state.galaxies.lock().unwrap();
+            let galaxies = app_state.galaxies.lock().await;
             assert!(galaxies.contains_key("test_galaxy_1"));
             assert!(galaxies.contains_key("test_galaxy_2"));
             assert_eq!(galaxies.len(), 2);

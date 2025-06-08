@@ -59,10 +59,11 @@ impl UserService {
         app_state: &crate::app::AppState,
     ) -> Result<(UserGalaxyAccount, Coords), UserServiceError> {
         // Check if user already has an account in this galaxy
-        if let Some(_) = self
+        if (self
             .db
             .get_user_galaxy_account(user_id, galaxy_name)
-            .await?
+            .await?)
+            .is_some()
         {
             return Err(UserServiceError::UserAlreadyInGalaxy);
         }
@@ -188,7 +189,7 @@ impl UserService {
 #[cfg(all(test, feature = "db"))]
 #[allow(dead_code)] // TODO: Update tests to use AppState instead of Galaxy directly
 mod tests {
-    
+
     use crate::Database;
 
     async fn setup_test_galaxy(db: &Database, galaxy_name: &str) {
