@@ -483,6 +483,54 @@ impl AppState {
     pub fn galaxies(&self) -> &Arc<Mutex<HashMap<String, Galaxy>>> {
         &self.galaxies
     }
+
+    /// Get a reference to the database (if persistence is enabled)
+    #[cfg(feature = "db")]
+    pub fn database(&self) -> Option<&Database> {
+        self.persistence_manager.as_ref().map(|pm| pm.database())
+    }
+
+    /// Create a user system in a galaxy safely without holding locks across awaits
+    #[cfg(feature = "db")]
+    pub async fn create_user_system_in_galaxy(
+        &self,
+        galaxy_name: &str,
+        tick: usize,
+    ) -> Result<(Coords, SystemInfo), String> {
+        // First, try to find available coordinates and create the system
+        let (coords, system_info) = {
+            let mut galaxies = self.galaxies.lock().unwrap();
+            if let Some(galaxy) = galaxies.get_mut(galaxy_name) {
+                if let Some(coords) = galaxy.create_user_system(tick) {
+                    // Get galaxy config first (immutable borrow)
+                    let galaxy_config = galaxy.get_config().clone();
+                    
+                    // Now get mutable system reference
+                    let system = galaxy.systems_mut().get_mut(&coords).unwrap();
+                    let system_info = SystemInfo {
+                        score: system.score(tick, &galaxy_config),
+                        resources: system.get_resources(),
+                        production: system.get_production(tick, &galaxy_config),
+                        structures: {
+                            let mut structures = indexmap::IndexMap::new();
+                            for (name, level) in system.get_structures() {
+                                structures.insert(name, level);
+                            }
+                            structures
+                        },
+                        events: system.get_events().clone(),
+                    };
+                    (coords, system_info)
+                } else {
+                    return Err("Galaxy is full - no space for new systems".to_string());
+                }
+            } else {
+                return Err(format!("Galaxy '{}' not found", galaxy_name));
+            }
+        };
+        // Lock is now released, safe to return
+        Ok((coords, system_info))
+    }
 }
 
 #[cfg(test)]

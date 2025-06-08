@@ -5,11 +5,12 @@ use galactic_war::{
 
 use std::sync::Arc;
 
+mod auth;
 mod web;
 
 use crate::web::GalacticWeb;
 
-use axum::{extract::Path, routing::get, Extension, Router};
+use axum::{extract::Path, routing::{get, post}, Extension, Router};
 use std::cmp::max;
 use std::str::FromStr;
 
@@ -35,6 +36,16 @@ async fn serve(app_state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error
     let app = Router::new()
         .route("/favicon.ico", get(favicon_get))
         .route("/robots.txt", get(robots_get))
+        // Auth routes
+        .route("/login", get(auth::login_page))
+        .route("/login", post(auth::handle_login))
+        .route("/register", get(auth::register_page))
+        .route("/register", post(auth::handle_register))
+        .route("/logout", get(auth::handle_logout))
+        .route("/dashboard", get(auth::user_dashboard))
+        .route("/join-galaxy", post(auth::handle_join_galaxy))
+        .route("/galaxy/:galaxy/dashboard", get(auth::galaxy_dashboard))
+        // Galaxy routes
         .route("/:galaxy", get(galaxy_get))
         .route("/:galaxy/", get(galaxy_get))
         .route("/:galaxy/stats", get(galaxy_stats_get))
@@ -68,12 +79,37 @@ async fn robots_get() -> Html<String> {
 /// Handler for GET requests to /
 async fn base_get(Extension(app_state): Extension<Arc<AppState>>) -> Html<String> {
     let mut page = r#"
+<!DOCTYPE html>
+<html>
 <head>
     <title>Galactic War</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .auth-links { display: flex; gap: 15px; }
+        .auth-links a { 
+            text-decoration: none; color: white; background: #007cba; 
+            padding: 10px 20px; border-radius: 4px; 
+        }
+        .auth-links a:hover { background: #005a8a; }
+        .galaxy-section { margin-bottom: 30px; }
+        button { 
+            padding: 10px 20px; background: #007cba; color: white; 
+            border: none; border-radius: 4px; cursor: pointer; 
+        }
+        button:hover { background: #005a8a; }
+        select, input[type="text"] { 
+            padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px; 
+        }
+        .form-group { margin-bottom: 15px; }
+        .intro { margin-bottom: 30px; background: #f0f8ff; padding: 20px; border-radius: 5px; }
+    </style>
     <script>
         function navigate() {
             var selectedGalaxy = document.getElementById("galaxies").value;
-            window.location.href = "/" + selectedGalaxy;
+            if (selectedGalaxy) {
+                window.location.href = "/" + selectedGalaxy;
+            }
         }
         window.onload = function() {
             document.getElementById("createGalaxy").onsubmit = function() {
@@ -84,8 +120,27 @@ async fn base_get(Extension(app_state): Extension<Arc<AppState>>) -> Html<String
     </script>
 </head>
 <body>
-    <h1>Galactic War</h1>
-    <select id="galaxies">
+    <div class="header">
+        <h1>🌌 Galactic War</h1>
+        <div class="auth-links">
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+            <a href="/dashboard">Dashboard</a>
+        </div>
+    </div>
+    
+    <div class="intro">
+        <h2>Welcome to Galactic War!</h2>
+        <p>A space conquest game where you manage stellar systems, build structures, and expand your galactic empire.</p>
+        <p><strong>New players:</strong> <a href="/register">Register an account</a> to join galaxies and own systems!</p>
+        <p><strong>Existing players:</strong> <a href="/login">Login</a> to access your dashboard and manage your empire.</p>
+    </div>
+    
+    <div class="galaxy-section">
+        <h2>Browse Public Galaxies</h2>
+        <p>View galaxy statistics and explore systems (read-only):</p>
+        <select id="galaxies">
+            <option value="">Choose a galaxy...</option>
     "#
     .to_string();
 
@@ -95,15 +150,21 @@ async fn base_get(Extension(app_state): Extension<Arc<AppState>>) -> Html<String
 
     page.push_str(
         r#"</select>
-    <button onclick="navigate()">Go to galaxy</button>
-    <br><br>
-    <h1>Create a new galaxy</h1>
-    <form id="createGalaxy" method="get">
-        <label for="newGalaxy">Enter New Galaxy Name:</label>
-        <input type="text" id="newGalaxy" name="newGalaxy" required>
-        <input type="submit" value="Submit">
-    </form>
+        <button onclick="navigate()">View Galaxy</button>
+    </div>
+    
+    <div class="galaxy-section">
+        <h2>Create a New Galaxy</h2>
+        <form id="createGalaxy" method="get">
+            <div class="form-group">
+                <label for="newGalaxy">Enter New Galaxy Name:</label>
+                <input type="text" id="newGalaxy" name="newGalaxy" required placeholder="Enter galaxy name">
+                <button type="submit">Create Galaxy</button>
+            </div>
+        </form>
+    </div>
 </body>
+</html>
 "#,
     );
     Html::from(page)
@@ -133,25 +194,72 @@ async fn galaxy_create_get(
 /// Handler for GET requests to /:galaxy/:x/:y/build/:structure
 async fn system_build_struct(
     Path((galaxy, x, y, structure)): Path<(String, usize, usize, String)>,
+    jar: axum_extra::extract::CookieJar,
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> Result<String, String> {
     if structure.is_empty() {
         return Err("No structure specified".to_string());
     }
 
-    let structure_type = StructureType::from_str(&structure)
-        .map_err(|_| format!("Invalid structure type: {}", structure))?;
-    let event = app_state
-        .build_structure(&galaxy, tick(), (x, y).into(), structure_type)
-        .await?;
-    Ok(format!("{:?}", event))
+    // Check if user is authenticated and owns this system
+    if let Some(user) = auth::get_current_user(jar, Extension(app_state.clone())).await {
+        if let Some(db) = app_state.database() {
+            let user_service = galactic_war::UserService::new(db.clone());
+                
+                // Check if user has an account in this galaxy
+                if let Ok(Some(account)) = user_service.get_user_galaxy_account(user.id, &galaxy).await {
+                    // Check if user owns this system
+                    if let Ok(user_systems) = user_service.get_user_systems_coords(account.id).await {
+                        let coords = (x, y).into();
+                        if user_systems.contains(&coords) {
+                            // User owns this system, allow the build
+                            let structure_type = StructureType::from_str(&structure)
+                                .map_err(|_| format!("Invalid structure type: {}", structure))?;
+                            let event = app_state
+                                .build_structure(&galaxy, tick(), coords, structure_type)
+                                .await?;
+                            return Ok(format!("{:?}", event));
+                        }
+                    }
+            }
+        }
+        Err("You don't own this system".to_string())
+    } else {
+        Err("You must be logged in to build structures".to_string())
+    }
 }
 
 /// Handler for GET requests to /:galaxy/:x/:y/build
 async fn system_build(
     Path((galaxy, x, y)): Path<(String, usize, usize)>,
+    jar: axum_extra::extract::CookieJar,
     Extension(app_state): Extension<Arc<AppState>>,
 ) -> Result<Html<String>, String> {
+    // Check if user is authenticated and owns this system
+    if let Some(user) = auth::get_current_user(jar, Extension(app_state.clone())).await {
+        if let Some(db) = app_state.database() {
+            let user_service = galactic_war::UserService::new(db.clone());
+                
+                // Check if user has an account in this galaxy
+                if let Ok(Some(account)) = user_service.get_user_galaxy_account(user.id, &galaxy).await {
+                    // Check if user owns this system
+                    if let Ok(user_systems) = user_service.get_user_systems_coords(account.id).await {
+                        let coords = (x, y).into();
+                        if !user_systems.contains(&coords) {
+                            return Err("You don't own this system".to_string());
+                        }
+                    } else {
+                        return Err("Failed to check system ownership".to_string());
+                    }
+                } else {
+                    return Err("You don't have an account in this galaxy".to_string());
+                }
+        } else {
+            return Err("User authentication not available".to_string());
+        }
+    } else {
+        return Err("You must be logged in to build structures".to_string());
+    }
     let dets = structure_info(&galaxy, (x, y).into(), "Colony", &app_state).await;
 
     let system_info = app_state.system_info(&galaxy, (x, y).into()).await?;

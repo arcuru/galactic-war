@@ -10,11 +10,15 @@ mod game_system;
 
 // Database and models modules
 #[cfg(feature = "db")]
+pub mod auth;
+#[cfg(feature = "db")]
 pub mod db;
 #[cfg(feature = "db")]
 pub mod models;
 #[cfg(feature = "db")]
 pub mod persistence;
+#[cfg(feature = "db")]
+pub mod user_service;
 
 use crate::config::GalaxyConfig;
 use crate::game_system::System;
@@ -25,9 +29,13 @@ pub use crate::game_system::{Event, EventCallback, StructureType};
 
 // Re-export database types when db feature is enabled
 #[cfg(feature = "db")]
+pub use crate::auth::*;
+#[cfg(feature = "db")]
 pub use crate::db::{Database, PersistenceError};
 #[cfg(feature = "db")]
 pub use crate::models::*;
+#[cfg(feature = "db")]
+pub use crate::user_service::*;
 
 /// Return the current second since the Unix epoch
 pub fn tick() -> usize {
@@ -291,6 +299,10 @@ impl Galaxy {
         &self.systems
     }
 
+    pub fn systems_mut(&mut self) -> &mut HashMap<Coords, System> {
+        &mut self.systems
+    }
+
     /// Build a structure in a system
     pub fn build(
         &mut self,
@@ -363,6 +375,57 @@ impl Galaxy {
     #[cfg(feature = "db")]
     pub fn get_tick(&self) -> usize {
         self.tick
+    }
+
+    /// Create a new system for a user at a random available location
+    #[cfg(feature = "db")]
+    pub fn create_user_system(&mut self, tick: usize) -> Option<Coords> {
+        let mut rng = rand::thread_rng();
+        let max_attempts = 1000;
+        
+        for _ in 0..max_attempts {
+            let x: usize = rng.gen_range(0..=self.config.size.x);
+            let y: usize = rng.gen_range(0..=self.config.size.y);
+            let coords = (x, y).into();
+            
+            if !self.systems.contains_key(&coords) {
+                // Found an empty location, create a new system
+                let system = System::new(tick, &self.config.systems, &self.config);
+                self.systems.insert(coords, system);
+                self.mark_system_dirty(coords);
+                return Some(coords);
+            }
+        }
+        
+        None // No available location found
+    }
+
+    /// Get all systems owned by a specific user (via coordinates)
+    #[cfg(feature = "db")]
+    pub fn get_user_systems(&self, user_owned_coords: &[Coords]) -> HashMap<Coords, &System> {
+        let mut user_systems = HashMap::new();
+        for &coords in user_owned_coords {
+            if let Some(system) = self.systems.get(&coords) {
+                user_systems.insert(coords, system);
+            }
+        }
+        user_systems
+    }
+
+    /// Get a mutable reference to a specific user system
+    #[cfg(feature = "db")]
+    pub fn get_user_system_mut(&mut self, coords: Coords, user_owned_coords: &[Coords]) -> Option<&mut System> {
+        if user_owned_coords.contains(&coords) {
+            self.systems.get_mut(&coords)
+        } else {
+            None
+        }
+    }
+
+    /// Check if a user can access a specific system
+    #[cfg(feature = "db")]
+    pub fn can_user_access_system(&self, coords: Coords, user_owned_coords: &[Coords]) -> bool {
+        user_owned_coords.contains(&coords)
     }
 }
 

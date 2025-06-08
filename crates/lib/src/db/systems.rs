@@ -15,16 +15,18 @@ impl Database {
         y: usize,
         resources: &crate::Resources,
         current_tick: usize,
+        user_galaxy_account_id: Option<i64>,
     ) -> Result<i64, PersistenceError> {
         let result = sqlx::query(
             r#"
-            INSERT INTO systems (galaxy_name, x, y, metal, crew, water, current_tick, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO systems (galaxy_name, x, y, metal, crew, water, current_tick, user_galaxy_account_id, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(galaxy_name, x, y) DO UPDATE SET
                 metal = excluded.metal,
                 crew = excluded.crew,
                 water = excluded.water,
                 current_tick = excluded.current_tick,
+                user_galaxy_account_id = excluded.user_galaxy_account_id,
                 updated_at = CURRENT_TIMESTAMP
             RETURNING id
             "#,
@@ -36,6 +38,7 @@ impl Database {
         .bind(resources.crew as i64)
         .bind(resources.water as i64)
         .bind(current_tick as i64)
+        .bind(user_galaxy_account_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -44,7 +47,7 @@ impl Database {
 
     /// Get all systems for a galaxy
     pub async fn get_systems(&self, galaxy_name: &str) -> Result<Vec<SystemRow>, PersistenceError> {
-        let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, created_at, updated_at FROM systems WHERE galaxy_name = ?")
+        let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, user_galaxy_account_id, created_at, updated_at FROM systems WHERE galaxy_name = ?")
             .bind(galaxy_name)
             .fetch_all(&self.pool)
             .await?;
@@ -60,6 +63,7 @@ impl Database {
                 crew: row.get("crew"),
                 water: row.get("water"),
                 current_tick: row.get("current_tick"),
+                user_galaxy_account_id: row.get("user_galaxy_account_id"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             });
@@ -75,7 +79,7 @@ impl Database {
         x: usize,
         y: usize,
     ) -> Result<Option<SystemRow>, PersistenceError> {
-        let result = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, created_at, updated_at FROM systems WHERE galaxy_name = ? AND x = ? AND y = ?")
+        let result = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, user_galaxy_account_id, created_at, updated_at FROM systems WHERE galaxy_name = ? AND x = ? AND y = ?")
             .bind(galaxy_name)
             .bind(x as i64)
             .bind(y as i64)
@@ -92,12 +96,85 @@ impl Database {
                 crew: row.get("crew"),
                 water: row.get("water"),
                 current_tick: row.get("current_tick"),
+                user_galaxy_account_id: row.get("user_galaxy_account_id"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             }))
         } else {
             Ok(None)
         }
+    }
+
+    /// Get systems owned by a specific user in a galaxy
+    pub async fn get_user_systems(
+        &self,
+        user_galaxy_account_id: i64,
+    ) -> Result<Vec<SystemRow>, PersistenceError> {
+        let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, user_galaxy_account_id, created_at, updated_at FROM systems WHERE user_galaxy_account_id = ?")
+            .bind(user_galaxy_account_id)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut systems = Vec::new();
+        for row in rows {
+            systems.push(SystemRow {
+                id: row.get("id"),
+                galaxy_name: row.get("galaxy_name"),
+                x: row.get("x"),
+                y: row.get("y"),
+                metal: row.get("metal"),
+                crew: row.get("crew"),
+                water: row.get("water"),
+                current_tick: row.get("current_tick"),
+                user_galaxy_account_id: row.get("user_galaxy_account_id"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            });
+        }
+
+        Ok(systems)
+    }
+
+    /// Get unowned systems in a galaxy (for assignment to new users)
+    pub async fn get_unowned_systems(&self, galaxy_name: &str) -> Result<Vec<SystemRow>, PersistenceError> {
+        let rows = sqlx::query("SELECT id, galaxy_name, x, y, metal, crew, water, current_tick, user_galaxy_account_id, created_at, updated_at FROM systems WHERE galaxy_name = ? AND user_galaxy_account_id IS NULL")
+            .bind(galaxy_name)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut systems = Vec::new();
+        for row in rows {
+            systems.push(SystemRow {
+                id: row.get("id"),
+                galaxy_name: row.get("galaxy_name"),
+                x: row.get("x"),
+                y: row.get("y"),
+                metal: row.get("metal"),
+                crew: row.get("crew"),
+                water: row.get("water"),
+                current_tick: row.get("current_tick"),
+                user_galaxy_account_id: row.get("user_galaxy_account_id"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            });
+        }
+
+        Ok(systems)
+    }
+
+    /// Assign a system to a user
+    pub async fn assign_system_to_user(
+        &self,
+        system_id: i64,
+        user_galaxy_account_id: i64,
+    ) -> Result<(), PersistenceError> {
+        sqlx::query("UPDATE systems SET user_galaxy_account_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(user_galaxy_account_id)
+            .bind(system_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 
     /// Delete all systems for a galaxy (used in cleanup)
@@ -139,7 +216,7 @@ mod tests {
         // Test system creation
         let resources = crate::Resources { metal, crew, water };
         let system_id = db
-            .save_system(galaxy_name, x, y, &resources, 0)
+            .save_system(galaxy_name, x, y, &resources, 0, None)
             .await
             .expect("Failed to save system");
 
@@ -174,7 +251,7 @@ mod tests {
         };
 
         let updated_system_id = db
-            .save_system(galaxy_name, x, y, &new_resources, 0)
+            .save_system(galaxy_name, x, y, &new_resources, 0, None)
             .await
             .expect("Failed to update system");
 
@@ -229,7 +306,7 @@ mod tests {
                 crew: *crew,
                 water: *water,
             };
-            db.save_system(galaxy_name, *x, *y, &resources, 0)
+            db.save_system(galaxy_name, *x, *y, &resources, 0, None)
                 .await
                 .expect("Failed to save system");
         }

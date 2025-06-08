@@ -13,6 +13,7 @@ pub struct SystemRow {
     pub crew: i64,
     pub water: i64,
     pub current_tick: i64,
+    pub user_galaxy_account_id: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -27,6 +28,7 @@ impl SystemRow {
         crew: usize,
         water: usize,
         current_tick: usize,
+        user_galaxy_account_id: Option<i64>,
     ) -> Self {
         let now = Utc::now();
         Self {
@@ -38,6 +40,7 @@ impl SystemRow {
             crew: crew as i64,
             water: water as i64,
             current_tick: current_tick as i64,
+            user_galaxy_account_id,
             created_at: now,
             updated_at: now,
         }

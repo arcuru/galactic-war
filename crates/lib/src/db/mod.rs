@@ -7,6 +7,7 @@ pub mod events;
 pub mod galaxies;
 pub mod structures;
 pub mod systems;
+pub mod users;
 
 // Error types for database operations
 #[cfg(feature = "db")]

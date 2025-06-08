@@ -1,26 +1,34 @@
 # User Accounts
 
-_This section describes the planned user account system for Galactic War._
+_This section describes future enhancements to the user account system for Galactic War._
 
-## Account System Overview
+## Current Implementation Status
 
-Galactic War will implement a comprehensive user account system to enable persistent gameplay, multi-galaxy participation, and social features.
+✅ **COMPLETED**: Basic user accounts are now implemented with:
+- Server-level user registration and authentication
+- Galaxy-specific accounts (one per galaxy per user)
+- System ownership and access control
+- Session-based authentication with secure cookies
+- User dashboards and galaxy management interfaces
 
-## User Account Features
+See the [User Accounts documentation](../user-accounts/overview.md) for details on the current implementation.
 
-### Authentication
+## Future Enhancements
 
-- **Email/Password Login** - Standard account creation and authentication
-- **Session Management** - Secure session handling and logout
+The following features represent planned extensions to the existing user account system:
+
+## Advanced Authentication Features
+
+### Enhanced Security
 - **Password Recovery** - Email-based password reset functionality
-- **Account Security** - Protection against unauthorized access
+- **Two-Factor Authentication** - Enhanced account security with TOTP/SMS
+- **OAuth Integration** - Login with Google, GitHub, Discord, etc.
+- **Account Lockout** - Protection against brute force attacks
 
-### Multi-Galaxy Support
-
-- **Multiple Worlds** - Participate in several galaxies simultaneously
-- **Galaxy Selection** - Easy switching between active games
-- **Independent Progress** - Separate empires in each galaxy
-- **Cross-Galaxy Statistics** - Overall account achievements and stats
+### Cross-Galaxy Features
+- **Cross-Galaxy Statistics** - Overall account achievements and stats across all galaxies
+- **Global Leaderboards** - Rankings that span multiple galaxies
+- **Achievement System** - Account-wide achievements and badges
 
 ### User Identity
 
@@ -88,20 +96,25 @@ Special permissions for galaxy management:
 - **Account Deletion** - Complete removal of user data upon request
 - **Privacy Controls** - User control over data sharing and visibility
 
-## Migration from Current System
+## Implementation Progress
 
-### Development Phases
+### Completed Phases
 
-1. **Phase 1** - Basic authentication and session management
-2. **Phase 2** - Multi-galaxy support and user dashboard
+✅ **Phase 1** - Basic authentication and session management  
+✅ **Phase 2** - Multi-galaxy support and user dashboard
+
+### Future Development Phases
+
 3. **Phase 3** - Social features and community integration
 4. **Phase 4** - Advanced features and administration tools
 
-### Backward Compatibility
+### Current Status
 
-- **Existing Games** - Maintain compatibility with current test deployments
-- **Data Migration** - Seamless transition from anonymous to authenticated play
-- **Progressive Enhancement** - Add features without disrupting existing gameplay
+The basic user account system is now fully functional with:
+- User registration and login working
+- Multi-galaxy account support implemented
+- System ownership and access control in place
+- User dashboards for account management
 
 ## Future Enhancements
 

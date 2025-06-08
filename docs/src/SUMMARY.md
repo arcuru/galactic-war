@@ -10,12 +10,17 @@
 - [Galaxy Configuration](./game-details/galaxy-config.md)
 - [Events and Time System](./game-details/events.md)
 
+# User Accounts
+
+- [Overview](./user-accounts/overview.md)
+- [Authentication](./user-accounts/authentication.md)
+- [Galaxy Accounts](./user-accounts/galaxy-accounts.md)
+
 # Future Plans
 
 - [Planned Features](./future-plans/planned-features.md)
 - [Combat System](./future-plans/combat.md)
 - [Fleets and Ships](./future-plans/fleets.md)
-- [User Accounts](./future-plans/user-accounts.md)
 - [Multiplayer Features](./future-plans/multiplayer.md)
 - [Quality of Life](./future-plans/qol.md)
 
