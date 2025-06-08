@@ -4,6 +4,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 pub mod app;
+pub mod app_config;
 pub mod config;
 mod game_system;
 
@@ -18,6 +19,8 @@ pub mod persistence;
 use crate::config::GalaxyConfig;
 use crate::game_system::System;
 
+pub use crate::app::AppState;
+pub use crate::app_config::AppConfig;
 pub use crate::game_system::{Event, EventCallback, StructureType};
 
 // Re-export database types when db feature is enabled

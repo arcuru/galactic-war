@@ -1,0 +1,19 @@
+# Galactic War Application Configuration
+# This file configures the binary/application behavior (not galaxy game configs)
+# Environment variables with GWAR_ prefix will override these settings
+
+persistence:
+  # Enable/disable database persistence
+  enabled: true
+  
+  # Auto-save interval in seconds
+  auto_save_interval: 30
+  
+  # Shutdown timeout in seconds
+  shutdown_timeout: 10
+  
+  # Enable write coalescing to batch database operations
+  write_coalescing: true
+  
+  # Write coalescing delay in milliseconds
+  coalescing_delay_ms: 1000

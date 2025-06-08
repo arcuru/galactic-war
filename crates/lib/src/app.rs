@@ -2,13 +2,12 @@ use crate::{config::GalaxyConfig, Coords, Details, Event, Galaxy, SystemInfo};
 
 #[cfg(feature = "db")]
 use crate::{
+    app_config::AppConfig,
     db::Database,
     persistence::{PersistenceConfig, PersistenceManager},
 };
 
 use std::collections::HashMap;
-#[cfg(feature = "db")]
-use std::env;
 use std::sync::{Arc, Mutex};
 
 /// Application state manager that coordinates between in-memory state and persistence
@@ -23,41 +22,32 @@ pub struct AppState {
 impl AppState {
     /// Initialize the application state with optional persistence
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        Self::new_with_config(None).await
+    }
+
+    /// Initialize with optional configuration file path
+    pub async fn new_with_config(
+        config_path: Option<&str>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let galaxies = Arc::new(Mutex::new(HashMap::new()));
 
         #[cfg(feature = "db")]
         {
-            // Check if persistence is enabled via environment variable
-            let persistence_enabled = env::var("GALACTIC_WAR_PERSISTENCE")
-                .unwrap_or_else(|_| "true".to_string())
-                .parse::<bool>()
-                .unwrap_or(true);
+            let app_config = AppConfig::load_from_file_and_env(config_path)?;
 
-            if persistence_enabled {
+            if app_config.persistence.enabled {
                 log::info!("Initializing with database persistence");
 
                 // Create database connection
                 let database = Database::new().await?;
 
-                // Configure persistence settings from environment variables
+                // Configure persistence settings from unified config
                 let config = PersistenceConfig {
-                    auto_save_interval: env::var("GALACTIC_WAR_AUTO_SAVE_INTERVAL")
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(30),
-                    shutdown_timeout: env::var("GALACTIC_WAR_SHUTDOWN_TIMEOUT")
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(10),
-                    enabled: persistence_enabled,
-                    write_coalescing: env::var("GALACTIC_WAR_WRITE_COALESCING")
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(true),
-                    coalescing_delay_ms: env::var("GALACTIC_WAR_COALESCING_DELAY_MS")
-                        .ok()
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(1000),
+                    auto_save_interval: app_config.persistence.auto_save_interval,
+                    shutdown_timeout: app_config.persistence.shutdown_timeout,
+                    enabled: app_config.persistence.enabled,
+                    write_coalescing: app_config.persistence.write_coalescing,
+                    coalescing_delay_ms: app_config.persistence.coalescing_delay_ms,
                 };
 
                 log::info!("Persistence config: auto_save_interval={}s, write_coalescing={}, coalescing_delay={}ms", 
@@ -83,6 +73,7 @@ impl AppState {
 
         #[cfg(not(feature = "db"))]
         {
+            let _ = config_path; // Suppress unused variable warning
             log::info!("Database persistence not available (compiled without 'db' feature)");
             Ok(Self { galaxies })
         }
