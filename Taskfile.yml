@@ -62,6 +62,17 @@ tasks:
     desc: Run the galactic-war server binary
     aliases: [r]
     cmd: cargo run --bin galactic-war
+  dev:
+    desc: Run the galactic-war server in dev mode with consistent database
+    aliases: [d]
+    env:
+      DATABASE_URL: "sqlite:.cache/galactic-war/dev.db"
+      GALACTIC_WAR_PERSISTENCE: "true"
+      GALACTIC_WAR_AUTO_SAVE_INTERVAL: "5"
+      GALACTIC_WAR_WRITE_COALESCING: "true"
+    cmds:
+      - mkdir -p ".cache/galactic-war"
+      - cargo run --bin galactic-war
   build:lib:
     desc: Build only the library crate
     cmd: cargo build -p galactic-war
