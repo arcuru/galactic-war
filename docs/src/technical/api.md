@@ -9,12 +9,73 @@ Galactic War provides a REST API for programmatic access to all game functions. 
 ### Base URL
 
 ```
+# Development (default)
+http://localhost:3050/
+
+# Production (planned)
 https://api.galactic-war.com/
+```
+
+### Quick Start
+
+```bash
+# Start the development server
+task dev  # or: task run
+
+# Server runs on http://localhost:3050
+# Web interface available at root URL
 ```
 
 ### Authentication
 
 _Authentication system is planned for future implementation._
+
+## HTTP Routes
+
+The API follows a REST-like pattern with the route structure: `/:galaxy/:x/:y[/:structure][/action]`
+
+```mermaid
+graph LR
+    subgraph "Route Structure"
+        ROOT["/"]
+        GALAXY["/{galaxy}"]
+        SYSTEM["/{galaxy}/{x}/{y}"]
+        STRUCTURE["/{galaxy}/{x}/{y}/{structure}"]
+        ACTION["/{galaxy}/{x}/{y}/{structure}/build"]
+    end
+    
+    ROOT --> GALAXY
+    GALAXY --> SYSTEM
+    SYSTEM --> STRUCTURE
+    STRUCTURE --> ACTION
+    
+    ROOT -.-> |"List available galaxies"| ROOT
+    GALAXY -.-> |"Galaxy overview"| GALAXY
+    SYSTEM -.-> |"System details"| SYSTEM
+    STRUCTURE -.-> |"Structure info"| STRUCTURE
+    ACTION -.-> |"Perform action"| ACTION
+```
+
+### Galaxy Management
+
+#### Get Available Galaxies
+
+```http
+GET /
+```
+
+Returns a list of available galaxies and the main game interface.
+
+#### Get Galaxy Information
+
+```http
+GET /{galaxy}
+```
+
+Returns overview information for a specific galaxy.
+
+**Parameters:**
+- `galaxy` - Galaxy name (e.g., "classic", "blitz")
 
 ## Core Endpoints
 
@@ -23,7 +84,7 @@ _Authentication system is planned for future implementation._
 #### Get Galaxy Stats
 
 ```http
-GET /stats
+GET /{galaxy}/stats
 ```
 
 Returns overall galaxy statistics including player count, system information, and general metrics.
@@ -42,7 +103,7 @@ Returns overall galaxy statistics including player count, system information, an
 #### Get System List
 
 ```http
-GET /systems
+GET /{galaxy}/systems
 ```
 
 Returns a list of all systems in the galaxy with basic information.
@@ -52,7 +113,7 @@ Returns a list of all systems in the galaxy with basic information.
 #### Get System Details
 
 ```http
-GET /system/{x}/{y}
+GET /{galaxy}/{x}/{y}
 ```
 
 Get detailed information about a specific system at coordinates (x, y).
@@ -95,18 +156,42 @@ Get detailed information about a specific system at coordinates (x, y).
 #### Build Structure
 
 ```http
-POST /system/{x}/{y}/build
+GET /{galaxy}/{x}/{y}/{structure}/build
+```
+
+Note: This is a GET request that initiates building, following the current GET-only API design.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as HTTP API
+    participant GE as Game Engine
+    participant DB as Database
+    
+    C->>API: GET /{galaxy}/{x}/{y}/asteroidmine/build
+    API->>GE: galaxy.build(x, y, "asteroidmine")
+    
+    alt Sufficient Resources
+        GE->>GE: Deduct resources
+        GE->>GE: Create build event
+        GE->>GE: Mark system dirty
+        GE-->>API: Success + Event details
+        API-->>C: 200 OK + Event JSON
+        
+        Note over DB: Background save
+        GE->>DB: Auto-save dirty system
+    else Insufficient Resources
+        GE-->>API: Error: Not enough resources
+        API-->>C: 400 Bad Request + Error
+    end
 ```
 
 Start construction of a new structure or upgrade an existing one.
 
-**Request Body:**
-
-```json
-{
-  "structure": "asteroidmine"
-}
-```
+**Parameters:**
+- `galaxy` - Galaxy name
+- `x`, `y` - System coordinates  
+- `structure` - Structure type to build
 
 **Response:**
 
@@ -126,13 +211,13 @@ Start construction of a new structure or upgrade an existing one.
 #### Get Structure Details
 
 ```http
-GET /system/{x}/{y}/structure/{structure_type}
+GET /{galaxy}/{x}/{y}/{structure_type}
 ```
 
 Get detailed information about a specific structure type in a system.
 
 **Parameters:**
-
+- `galaxy` - Galaxy name
 - `x`, `y` - System coordinates
 - `structure_type` - Type of structure (colony, asteroidmine, etc.)
 
@@ -159,9 +244,36 @@ Get detailed information about a specific structure type in a system.
 
 Real-time updates are provided via WebSocket connections.
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant WS as WebSocket Server
+    participant GE as Game Engine
+    participant Timer
+    
+    C->>WS: Connect to ws://localhost:3050/ws
+    WS-->>C: Connection established
+    
+    Note over Timer,GE: Every tick (1 second)
+    Timer->>GE: Process tick
+    GE->>GE: Complete events
+    GE->>GE: Update production
+    
+    alt Changes occurred
+        GE->>WS: Broadcast system updates
+        WS->>C: System update message
+        WS->>C: Event completion message
+        C->>C: Update UI
+    end
+```
+
 ### Connection
 
 ```javascript
+// Development
+const ws = new WebSocket("ws://localhost:3050/ws");
+
+// Production (planned)
 const ws = new WebSocket("wss://api.galactic-war.com/ws");
 ```
 
@@ -198,6 +310,26 @@ Sent when an event completes:
 ```
 
 ## Error Handling
+
+```mermaid
+flowchart TD
+    REQ[API Request] --> VAL{Validate Request}
+    
+    VAL -->|Invalid Galaxy| E1[404: Galaxy not found]
+    VAL -->|Invalid Coords| E2[404: System not found]
+    VAL -->|Invalid Structure| E3[400: Invalid structure type]
+    VAL -->|Valid| CHECK{Check Preconditions}
+    
+    CHECK -->|Insufficient Resources| E4[400: Insufficient resources]
+    CHECK -->|Already Building| E5[409: Construction in progress]
+    CHECK -->|Valid| SUCCESS[200: Success]
+    
+    E1 --> ERROR[Error Response]
+    E2 --> ERROR
+    E3 --> ERROR
+    E4 --> ERROR
+    E5 --> ERROR
+```
 
 ### Standard Error Response
 

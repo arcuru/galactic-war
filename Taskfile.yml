@@ -92,3 +92,9 @@ tasks:
     desc: Run the docker image
     cmd: docker run --rm -p 3050:3050 --name galactic-war galactic-war:latest
     deps: [build:docker]
+  docs:serve:
+    desc: Serve and open the mdbook documentation
+    aliases: [docs]
+    dir: docs
+    cmds:
+      - mdbook serve --open

@@ -9,6 +9,7 @@ _This section provides information for developers interested in contributing to 
 - **Rust** (latest stable version)
 - **Cargo** (included with Rust)
 - **Git** for version control
+- **Task** (task runner, see [taskfile.dev](https://taskfile.dev/installation/))
 - **mdbook** for documentation (optional)
 
 ### Clone and Build
@@ -19,20 +20,23 @@ git clone https://github.com/arcuru/galactic-war.git
 cd galactic-war
 
 # Build the entire workspace
-cargo build --workspace
+task build  # or: cargo build --workspace
 
 # Build specific crates
-cargo build -p galactic-war      # Library crate only
-cargo build -p galactic-war-bin  # Binary crate only
+task build:lib  # or: cargo build -p galactic-war
+task build:bin  # or: cargo build -p galactic-war-bin
 
-# Run tests across workspace (including database tests)
-cargo nextest run --workspace
+# Run tests across workspace
+task test  # or: cargo nextest run --workspace
 
-# Start the development server (includes database features by default)
-cargo run --bin galactic-war
+# Start the development server with persistent database
+task dev
 
-# Alternative using task runner
-task run
+# Or run normally (in-memory database)
+task run  # or: cargo run --bin galactic-war
+
+# See all available commands
+task --list
 ```
 
 ### Development Dependencies
@@ -154,18 +158,19 @@ When reporting bugs or suggesting features:
 **Environment Setup**
 
 ```bash
-# Set database URL (optional, defaults to sqlite:galactic_war.db)
-export DATABASE_URL=sqlite:dev.db
+# Use development mode (recommended)
+task dev  # Creates persistent dev database at .cache/galactic-war/dev.db
 
-# Configure persistence settings
-export GALACTIC_WAR_AUTO_SAVE_INTERVAL=10  # Save every 10 seconds in dev
-export RUST_LOG=info                       # Enable persistence logging
+# Or manually set environment variables
+export DATABASE_URL=sqlite:.cache/galactic-war/dev.db
+export GWAR_PERSISTENCE_ENABLED=true
+export GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL=5  # Fast saves for development
+export RUST_LOG=info
 ```
 
 **Feature Flags (Library Crate)**
 
 - `db`: Enables database persistence functionality (SQLite, migrations, auto-save)
-- `bin`: Enables web server dependencies (axum, tokio) for library use
 
 The binary crate automatically includes database features by default.
 
@@ -183,11 +188,14 @@ sqlx migrate info --database-url sqlite:galactic_war.db
 **Development Database**
 
 ```bash
-# Use separate database for development
-DATABASE_URL=sqlite:dev.db cargo run --bin galactic-war
+# Use development mode (creates .cache/galactic-war/dev.db)
+task dev
 
 # Reset development database
-rm dev.db && cargo run --bin galactic-war
+rm -rf .cache/galactic-war/ && task dev
+
+# Use custom database location
+DATABASE_URL=sqlite:custom.db task run
 ```
 
 ### Testing Database Features
@@ -237,21 +245,21 @@ async fn test_my_feature() {
 
 ```bash
 # Enable detailed persistence logging
-RUST_LOG=galactic_war::persistence=debug cargo run --bin galactic-war
+RUST_LOG=galactic_war::persistence=debug task dev
 
 # Check database contents directly
-sqlite3 galactic_war.db ".tables"
-sqlite3 galactic_war.db "SELECT * FROM galaxies;"
+sqlite3 .cache/galactic-war/dev.db ".tables"
+sqlite3 .cache/galactic-war/dev.db "SELECT * FROM galaxies;"
 ```
 
 **Performance Testing**
 
 ```bash
-# Test with frequent saves
-GALACTIC_WAR_AUTO_SAVE_INTERVAL=1 cargo run --bin galactic-war
+# Test with frequent saves (task dev already uses 5-second interval)
+GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL=1 task dev
 
 # Monitor save performance
-RUST_LOG=galactic_war::persistence=info cargo run --bin galactic-war
+RUST_LOG=galactic_war::persistence=info task dev
 ```
 
 ## Testing Strategy
@@ -260,11 +268,11 @@ RUST_LOG=galactic_war::persistence=info cargo run --bin galactic-war
 
 ```bash
 # Run all tests across workspace
-cargo nextest run --workspace
+task test  # or: cargo nextest run --workspace
 
 # Run tests for specific crate
-cargo nextest run -p galactic-war      # Library tests
-cargo nextest run -p galactic-war-bin  # Binary tests
+task test:lib  # or: cargo nextest run -p galactic-war
+task test:bin  # or: cargo nextest run -p galactic-war-bin
 
 # Run specific test module
 cargo nextest run -p galactic-war system

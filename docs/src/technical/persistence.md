@@ -16,26 +16,103 @@ The persistence system provides:
 
 ### Components
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   AppState      │    │ PersistenceManager│    │   Database      │
-│   Manager       │    │                   │    │   (SQLite)      │
-└─────────┬───────┘    └─────────┬─────────┘    └─────────┬───────┘
-          │                      │                        │
-          │ Galaxy Operations    │ Background Saves       │ SQL Operations
-          │                      │                        │
-┌─────────▼───────┐    ┌─────────▼─────────┐    ┌─────────▼───────┐
-│ In-Memory       │    │ Write Coalescing  │    │ Tables:         │
-│ Galaxy Cache    │◄───┤ & Batching        │◄───┤ - galaxies      │
-│ (GALAXIES)      │    │                   │    │ - systems       │
-└─────────────────┘    └───────────────────┘    │ - structures    │
-                                                │ - events        │
-                                                └─────────────────┘
+```mermaid
+graph TB
+    subgraph "Application Layer"
+        AS[AppState Manager<br/>Coordinates state]
+        CACHE[In-Memory Galaxy Cache<br/>GALAXIES HashMap]
+    end
+    
+    subgraph "Persistence Layer"
+        PM[Persistence Manager<br/>Background saves]
+        WC[Write Coalescing<br/>Batch operations]
+        DT[Dirty Tracking<br/>Changed systems only]
+    end
+    
+    subgraph "Database Layer"
+        CP[Connection Pool<br/>SQLite connections]
+        DB[(SQLite Database)]
+        
+        subgraph "Tables"
+            T1[galaxies]
+            T2[systems]
+            T3[structures]
+            T4[events]
+        end
+    end
+    
+    AS --> CACHE
+    AS --> PM
+    PM --> WC
+    PM --> DT
+    WC --> CP
+    DT --> CP
+    CP --> DB
+    
+    DB --> T1
+    DB --> T2
+    DB --> T3
+    DB --> T4
+    
+    CACHE -.->|Load on miss| PM
+    PM -.->|Auto-save timer| WC
+    
+    style AS fill:#e1f5fe
+    style CACHE fill:#e8f5e8
+    style PM fill:#f3e5f5
+    style WC fill:#fff3e0
+    style DT fill:#fff3e0
+    style DB fill:#ffebee
 ```
 
 ### Database Schema
 
 The persistence layer uses SQLite with the following schema:
+
+```mermaid
+erDiagram
+    galaxies {
+        string name PK
+        string config_file
+        integer tick
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    systems {
+        integer id PK
+        string galaxy_name FK
+        integer x
+        integer y
+        integer metal
+        integer crew
+        integer water
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    structures {
+        integer id PK
+        integer system_id FK
+        string structure_type
+        integer level
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    events {
+        integer id PK
+        integer system_id FK
+        integer completion_tick
+        string action_type
+        string structure_type
+        timestamp created_at
+    }
+    
+    galaxies ||--o{ systems : contains
+    systems ||--o{ structures : has
+    systems ||--o{ events : schedules
+```
 
 **Galaxies Table**
 
@@ -102,26 +179,26 @@ CREATE TABLE events (
 
 The persistence system is configured through environment variables:
 
-| Variable                           | Default                  | Description                     |
-| ---------------------------------- | ------------------------ | ------------------------------- |
-| `DATABASE_URL`                     | `sqlite:galactic_war.db` | Database connection string      |
-| `GALACTIC_WAR_PERSISTENCE`         | `true`                   | Enable/disable persistence      |
-| `GALACTIC_WAR_AUTO_SAVE_INTERVAL`  | `30`                     | Auto-save interval (seconds)    |
-| `GALACTIC_WAR_SHUTDOWN_TIMEOUT`    | `10`                     | Shutdown save timeout (seconds) |
-| `GALACTIC_WAR_WRITE_COALESCING`    | `true`                   | Enable write batching           |
-| `GALACTIC_WAR_COALESCING_DELAY_MS` | `1000`                   | Write coalescing delay (ms)     |
+| Variable                            | Default                  | Description                     |
+| ----------------------------------- | ------------------------ | ------------------------------- |
+| `DATABASE_URL`                      | `sqlite:galactic_war.db` | Database connection string      |
+| `GWAR_PERSISTENCE_ENABLED`          | `true`                   | Enable/disable persistence      |
+| `GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL` | `30`                     | Auto-save interval (seconds)    |
+| `GWAR_PERSISTENCE_SHUTDOWN_TIMEOUT` | `10`                     | Shutdown save timeout (seconds) |
+| `GWAR_PERSISTENCE_WRITE_COALESCING` | `true`                   | Enable write batching           |
+| `GWAR_PERSISTENCE_COALESCING_DELAY_MS` | `1000`                   | Write coalescing delay (ms)     |
 
 ### Example Configuration
 
 ```bash
 # Production with 60-second saves
 DATABASE_URL=sqlite:production.db
-GALACTIC_WAR_AUTO_SAVE_INTERVAL=60
-GALACTIC_WAR_WRITE_COALESCING=true
+GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL=60
+GWAR_PERSISTENCE_WRITE_COALESCING=true
 
-# Development with frequent saves
-DATABASE_URL=sqlite:dev.db
-GALACTIC_WAR_AUTO_SAVE_INTERVAL=10
+# Development with frequent saves (or use task dev)
+DATABASE_URL=sqlite:.cache/galactic-war/dev.db
+GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL=5
 RUST_LOG=info
 ```
 
@@ -138,6 +215,31 @@ PersistenceConfig {
     enabled: true,
     // ... other settings
 }
+```
+
+```mermaid
+sequenceDiagram
+    participant GE as Game Engine
+    participant DT as Dirty Tracker
+    participant Timer
+    participant PM as Persistence Manager
+    participant DB as Database
+    
+    GE->>DT: Mark system dirty
+    Note over DT: System coordinates stored
+    
+    Timer->>PM: Auto-save interval (30s)
+    PM->>DT: Check for dirty galaxies
+    DT-->>PM: Return dirty systems list
+    
+    alt Has dirty systems
+        PM->>DB: Begin transaction
+        PM->>DB: Batch save dirty systems
+        PM->>DB: Commit transaction
+        PM->>DT: Clear dirty flags
+    else No dirty systems
+        PM->>PM: Skip save cycle
+    end
 ```
 
 **How it works:**
@@ -181,6 +283,26 @@ impl Galaxy {
 ### Write Coalescing
 
 Multiple rapid changes are batched together to improve performance:
+
+```mermaid
+timeline
+    title Write Coalescing Timeline
+    
+    section Collection Phase
+        0ms    : Change 1 : System marked dirty
+        250ms  : Change 2 : Same system updated
+        500ms  : Change 3 : Another system dirty
+        750ms  : Change 4 : More changes accumulate
+    
+    section Coalescing Delay
+        1000ms : Delay Complete : Wait period ends
+        
+    section Batch Write
+        1010ms : Begin Transaction : Start database write
+        1050ms : Save All Changes : Single transaction
+        1100ms : Commit : All changes persisted
+        1110ms : Clear Dirty Flags : Reset state
+```
 
 1. **Collection Phase**: Changes accumulate in memory
 2. **Coalescing Delay**: Wait for additional changes (default: 1 second)
@@ -250,32 +372,39 @@ All related changes are saved in single transactions:
 
 ```bash
 # Start with default persistence
-cargo run --features bin,db
+task run  # or: cargo run --bin galactic-war
+
+# Development mode (recommended - creates persistent dev database)
+task dev
 
 # Custom database location
-DATABASE_URL=sqlite:custom.db cargo run --features bin,db
+DATABASE_URL=sqlite:custom.db task run
 ```
 
 ### Development Mode
 
 ```bash
-# Enable debug logging
-RUST_LOG=info cargo run --features bin,db
+# Enable debug logging (task dev already includes good defaults)
+RUST_LOG=info task dev
 
-# Frequent saves for testing
-GALACTIC_WAR_AUTO_SAVE_INTERVAL=5 cargo run --features bin,db
+# Frequent saves for testing (task dev already uses 5-second interval)
+GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL=1 task dev
 ```
 
 ### Production Deployment
 
 ```bash
 # Build optimized binary
-cargo build --release --all-features
+task build  # or: cargo build --release --workspace
 
 # Run with production settings
 DATABASE_URL=sqlite:/data/galactic_war.db \
-GALACTIC_WAR_AUTO_SAVE_INTERVAL=60 \
+GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL=60 \
 ./target/release/galactic-war
+
+# Or use Docker for production
+task build:docker
+task run:docker
 ```
 
 ### Persistence Management
@@ -294,14 +423,17 @@ app_state.shutdown().await?;
 The persistence system includes comprehensive test coverage:
 
 ```bash
-# Run all persistence tests
-cargo test --features db
+# Run all tests across workspace (includes persistence tests)
+task test  # or: cargo nextest run --workspace
+
+# Run tests for library crate only
+task test:lib  # or: cargo nextest run -p galactic-war
 
 # Database-specific tests
-cargo test --features db db::
+cargo nextest run -p galactic-war db::
 
 # Integration tests
-cargo test --features db app::tests
+cargo nextest run -p galactic-war app::tests
 ```
 
 ### Test Infrastructure
@@ -318,7 +450,7 @@ cargo test --features db app::tests
 Enable detailed persistence logging:
 
 ```bash
-RUST_LOG=galactic_war::persistence=debug cargo run --features bin,db
+RUST_LOG=galactic_war::persistence=debug task dev
 ```
 
 **Log Events:**

@@ -162,6 +162,7 @@
           statix
 
           mdbook
+          mdbook-mermaid
 
           # Code coverage
           cargo-tarpaulin

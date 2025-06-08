@@ -124,6 +124,16 @@ systems:
       cost_multiplier: 1.1 # Cheaper upgrades
 ```
 
+**Development Usage:**
+
+```bash
+# Use development mode with custom galaxy config
+task dev
+
+# Or specify custom config location
+DATABASE_URL=sqlite:.cache/galactic-war/dev.db task run
+```
+
 ### Resource-Scarce Survival
 
 ```yaml

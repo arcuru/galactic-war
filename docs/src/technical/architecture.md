@@ -4,38 +4,58 @@ Galactic War is designed as a modular, high-performance system built in Rust. Th
 
 ## System Overview
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Frontend  │    │   CLI Client    │    │  Third-party    │
-│                 │    │                 │    │     Tools       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                ┌─────────────────▼─────────────────┐
-                │            HTTP API               │
-                │         (Axum Server)             │
-                └─────────────────┬─────────────────┘
-                                 │
-                ┌─────────────────▼─────────────────┐
-                │          Game Engine              │
-                │        (Rust Library)             │
-                └─────────────────┬─────────────────┘
-                                 │
-                ┌─────────────────▼─────────────────┐
-                │      Database Persistence         │
-                │       (SQLite/AppState)           │
-                └─────────────────┬─────────────────┘
-                                 │
-                ┌─────────────────▼─────────────────┐
-                │         Configuration             │
-                │        (YAML Files)               │
-                └───────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        WF[Web Frontend]
+        CLI[CLI Client]
+        TP[Third-party Tools]
+    end
+    
+    subgraph "Server Layer"
+        API[HTTP API<br/>Axum Server<br/>Port 3050]
+    end
+    
+    subgraph "Core Library (crates/lib)"
+        GE[Game Engine<br/>Galaxy Management<br/>Event System]
+        AS[AppState<br/>State Coordination]
+    end
+    
+    subgraph "Persistence Layer"
+        PM[Persistence Manager<br/>Auto-save & Load]
+        DB[(SQLite Database<br/>Galaxies, Systems, Events)]
+    end
+    
+    subgraph "Configuration"
+        AC[App Config<br/>config.yaml]
+        GC[Galaxy Configs<br/>data/*.yaml]
+    end
+    
+    WF --> API
+    CLI --> API
+    TP --> API
+    
+    API --> GE
+    GE --> AS
+    AS --> PM
+    PM --> DB
+    
+    AC --> API
+    GC --> GE
+    
+    style WF fill:#e1f5fe
+    style CLI fill:#e1f5fe
+    style TP fill:#e1f5fe
+    style API fill:#f3e5f5
+    style GE fill:#e8f5e8
+    style AS fill:#e8f5e8
+    style PM fill:#fff3e0
+    style DB fill:#fff3e0
 ```
 
 ## Core Components
 
-### Rust Library (`lib.rs`)
+### Rust Library Crate (`crates/lib`)
 
 The heart of the system is a pure Rust library that implements all game logic:
 
@@ -80,7 +100,7 @@ Real-time database persistence ensures data durability:
 - Transactional batching for consistency
 - Connection pooling for performance
 
-### Binary Application (`main.rs`)
+### Binary Application Crate (`crates/bin`)
 
 The server binary provides network access to the game library:
 
@@ -156,37 +176,84 @@ Designed for high performance and scalability:
 
 ### Game State Updates
 
-1. **API Request** received by HTTP server
-2. **Library Call** delegates to game library
-3. **Event Creation** schedules future actions
-4. **State Update** modifies galaxy state
-5. **Response** returns updated information
-6. **Event Processing** happens automatically on ticks
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as HTTP API
+    participant GE as Game Engine
+    participant PM as Persistence Manager
+    participant DB as Database
+    
+    Client->>API: HTTP Request (e.g., build structure)
+    API->>GE: Call library function
+    GE->>GE: Validate request
+    GE->>GE: Create event (future action)
+    GE->>GE: Update galaxy state
+    GE->>PM: Mark system as dirty
+    GE-->>API: Return response
+    API-->>Client: HTTP Response
+    
+    Note over PM: Background Process
+    PM->>PM: Check dirty systems
+    PM->>DB: Batch save changes
+    DB-->>PM: Confirm save
+```
 
-### Real-Time Updates
+### Real-Time Tick Processing
 
-1. **Tick Processing** evaluates completed events
-2. **State Changes** update galaxy state
-3. **WebSocket Broadcast** notifies connected clients
-4. **Frontend Update** refreshes user interface
+```mermaid
+sequenceDiagram
+    participant Timer
+    participant GE as Game Engine
+    participant PM as Persistence Manager
+    participant WS as WebSocket
+    participant Client
+    
+    Timer->>GE: Tick event (every second)
+    GE->>GE: Process completed events
+    GE->>GE: Update resources & production
+    GE->>GE: Apply structure completions
+    GE->>PM: Mark changed systems dirty
+    GE->>WS: Broadcast state changes
+    WS->>Client: Real-time updates
+    Client->>Client: Update UI
+```
 
 ## File Structure
 
 ```
-src/
-├── lib.rs          # Main library interface
-├── main.rs         # Binary server application
-├── system.rs       # Solar system implementation
-├── config.rs       # Configuration structures
-├── web.rs          # HTTP server and routes
-└── utils.rs        # Utility functions
+crates/
+├── lib/                    # Library crate (galactic-war)
+│   ├── Cargo.toml          # Library dependencies and config
+│   ├── migrations/         # Database schema migrations
+│   │   └── 001_initial_schema.sql
+│   └── src/
+│       ├── lib.rs          # Main library interface
+│       ├── app.rs          # Application state management
+│       ├── app_config.rs   # Application configuration
+│       ├── config.rs       # Galaxy configuration structures
+│       ├── game_system.rs  # Core game system logic
+│       ├── persistence.rs  # Database persistence manager
+│       ├── db/             # Database operations
+│       │   ├── mod.rs
+│       │   ├── events.rs
+│       │   ├── galaxies.rs
+│       │   ├── structures.rs
+│       │   └── systems.rs
+│       └── models/         # Data models
+│           ├── mod.rs
+│           ├── events.rs
+│           ├── galaxy.rs
+│           └── system.rs
+└── bin/                    # Binary crate (galactic-war-bin)
+    ├── Cargo.toml          # Binary dependencies and config
+    └── src/
+        └── main.rs         # HTTP server application
 
-galaxies/
-├── classic.yaml    # Long-term gameplay configuration
-└── blitz.yaml      # Fast-paced gameplay configuration
-
+config.yaml                 # Application configuration
+data/                       # Galaxy configuration files
 docs/
-└── src/            # Documentation source files
+└── src/                    # Documentation source files
 ```
 
 ## Future Architecture Plans
@@ -212,6 +279,48 @@ Split components for better scaling:
 ### Container Deployment
 
 Dockerized deployment for easy scaling:
+
+```bash
+# Build and run with Docker
+task build:docker
+task run:docker
+```
+
+```mermaid
+graph TB
+    subgraph "Docker Infrastructure"
+        LB[Load Balancer<br/>nginx/traefik]
+        
+        subgraph "Galaxy Containers"
+            GC1[Galaxy Container 1<br/>Classic Mode]
+            GC2[Galaxy Container 2<br/>Blitz Mode]
+            GC3[Galaxy Container N<br/>Custom Mode]
+        end
+        
+        subgraph "Shared Services"
+            SD[Service Discovery<br/>consul/etcd]
+            HM[Health Monitor<br/>prometheus]
+            DB1[(Persistent Volume<br/>Galaxy 1 DB)]
+            DB2[(Persistent Volume<br/>Galaxy 2 DB)]
+        end
+    end
+    
+    Users --> LB
+    LB --> GC1
+    LB --> GC2
+    LB --> GC3
+    
+    GC1 --> DB1
+    GC2 --> DB2
+    
+    SD --> GC1
+    SD --> GC2
+    SD --> GC3
+    
+    HM --> GC1
+    HM --> GC2
+    HM --> GC3
+```
 
 - **Galaxy Containers** - One container per galaxy
 - **Load Balancer** - Distribute traffic across instances
