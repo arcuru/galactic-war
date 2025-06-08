@@ -67,9 +67,9 @@ tasks:
     aliases: [d]
     env:
       DATABASE_URL: "sqlite:.cache/galactic-war/dev.db"
-      GALACTIC_WAR_PERSISTENCE: "true"
-      GALACTIC_WAR_AUTO_SAVE_INTERVAL: "5"
-      GALACTIC_WAR_WRITE_COALESCING: "true"
+      GWAR_PERSISTENCE_ENABLED: "true"
+      GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL: "5"
+      GWAR_PERSISTENCE_WRITE_COALESCING: "true"
     cmds:
       - mkdir -p ".cache/galactic-war"
       - cargo run --bin galactic-war

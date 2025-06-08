@@ -121,12 +121,29 @@ impl Database {
     ) -> Result<(), PersistenceError> {
         let mut tx = self.pool.begin().await?;
 
-        // Update galaxy metadata
-        sqlx::query("UPDATE galaxies SET tick = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?")
-            .bind(galaxy.get_tick() as i64)
+        // Ensure galaxy exists in database, create if it doesn't
+        let galaxy_exists = sqlx::query("SELECT 1 FROM galaxies WHERE name = ? LIMIT 1")
             .bind(galaxy_name)
-            .execute(&mut *tx)
-            .await?;
+            .fetch_optional(&mut *tx)
+            .await?
+            .is_some();
+
+        if !galaxy_exists {
+            // Create galaxy record if it doesn't exist
+            sqlx::query("INSERT INTO galaxies (name, config_file, tick) VALUES (?, ?, ?)")
+                .bind(galaxy_name)
+                .bind("") // Empty config file for existing galaxies
+                .bind(galaxy.get_tick() as i64)
+                .execute(&mut *tx)
+                .await?;
+        } else {
+            // Update galaxy metadata
+            sqlx::query("UPDATE galaxies SET tick = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?")
+                .bind(galaxy.get_tick() as i64)
+                .bind(galaxy_name)
+                .execute(&mut *tx)
+                .await?;
+        }
 
         // Get dirty systems to minimize database writes
         let systems_to_save: Vec<_> = if galaxy.needs_persist() {
@@ -200,7 +217,8 @@ impl Database {
         let resources = system.get_resources();
         let current_tick = system.get_current_tick();
 
-        let result = sqlx::query(
+        // Use RETURNING to get the ID whether it's an insert or update
+        let row = sqlx::query(
             r#"
             INSERT INTO systems (galaxy_name, x, y, metal, crew, water, current_tick, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -220,10 +238,10 @@ impl Database {
         .bind(resources.crew as i64)
         .bind(resources.water as i64)
         .bind(current_tick as i64)
-        .execute(&mut **tx)
+        .fetch_one(&mut **tx)
         .await?;
 
-        Ok(result.last_insert_rowid())
+        Ok(row.get("id"))
     }
 
     /// Load complete galaxy state from database
