@@ -58,10 +58,17 @@ impl AppState {
                 let persistence_manager =
                     PersistenceManager::new(database, config, galaxies_weak).await?;
 
-                Ok(Self {
+                let app_state = Self {
                     persistence_manager: Some(persistence_manager),
                     galaxies,
-                })
+                };
+
+                // Load all existing galaxies at startup
+                if let Err(e) = app_state.load_all_galaxies().await {
+                    log::error!("Failed to load galaxies at startup: {}", e);
+                }
+
+                Ok(app_state)
             } else {
                 log::info!("Persistence disabled via configuration");
                 Ok(Self {
@@ -306,14 +313,77 @@ impl AppState {
         }
 
         #[cfg(feature = "db")]
-        if let Some(ref _pm) = self.persistence_manager {
-            // TODO: Implement database galaxy listing
-            // For now, we only show galaxies in memory
+        if let Some(ref pm) = self.persistence_manager {
+            // Get galaxies from database
+            match pm.database().list_galaxy_names().await {
+                Ok(db_galaxies) => {
+                    galaxies.extend(db_galaxies);
+                    log::debug!("Found {} galaxies in database", galaxies.len());
+                }
+                Err(e) => {
+                    log::error!("Failed to list galaxies from database: {}", e);
+                }
+            }
         }
 
         galaxies.sort();
         galaxies.dedup();
         galaxies
+    }
+
+    /// Load all existing galaxies from database into memory
+    async fn load_all_galaxies(&self) -> Result<(), String> {
+        #[cfg(feature = "db")]
+        if let Some(ref pm) = self.persistence_manager {
+            // Get list of all galaxy names from database
+            let galaxy_names = match pm.database().list_galaxy_names().await {
+                Ok(names) => names,
+                Err(e) => {
+                    return Err(format!("Failed to list galaxy names from database: {}", e));
+                }
+            };
+
+            let total_count = galaxy_names.len();
+            log::info!("Loading {} galaxies from database...", total_count);
+            let mut loaded_count = 0;
+
+            // Load each galaxy
+            for galaxy_name in galaxy_names {
+                match pm.load_galaxy(&galaxy_name).await {
+                    Ok(Some(galaxy)) => {
+                        let mut galaxies = self.galaxies.lock().unwrap();
+                        galaxies.insert(galaxy_name.clone(), galaxy);
+                        loaded_count += 1;
+                        log::debug!("Loaded galaxy: {}", galaxy_name);
+                    }
+                    Ok(None) => {
+                        log::warn!(
+                            "Galaxy '{}' exists in database but failed to load",
+                            galaxy_name
+                        );
+                    }
+                    Err(e) => {
+                        log::error!("Failed to load galaxy '{}': {}", galaxy_name, e);
+                    }
+                }
+            }
+
+            log::info!(
+                "Successfully loaded {}/{} galaxies",
+                loaded_count,
+                total_count
+            );
+            Ok(())
+        } else {
+            log::debug!("No persistence manager available, skipping galaxy loading");
+            Ok(())
+        }
+
+        #[cfg(not(feature = "db"))]
+        {
+            log::debug!("Database persistence not available, skipping galaxy loading");
+            Ok(())
+        }
     }
 
     /// Ensure a galaxy is loaded into memory
@@ -492,6 +562,34 @@ mod tests {
 
         // Test graceful shutdown
         let result = app_state.shutdown().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_galaxy_preloading() {
+        let app_state = AppState::new_test().await.unwrap();
+        let config = create_test_config();
+
+        // Create two test galaxies
+        app_state
+            .create_galaxy("test_galaxy_1", &config, 0)
+            .await
+            .unwrap();
+        app_state
+            .create_galaxy("test_galaxy_2", &config, 0)
+            .await
+            .unwrap();
+
+        // Verify both galaxies are in memory
+        {
+            let galaxies = app_state.galaxies.lock().unwrap();
+            assert!(galaxies.contains_key("test_galaxy_1"));
+            assert!(galaxies.contains_key("test_galaxy_2"));
+            assert_eq!(galaxies.len(), 2);
+        }
+
+        // Test that load_all_galaxies works (should be a no-op since no persistence in test mode)
+        let result = app_state.load_all_galaxies().await;
         assert!(result.is_ok());
     }
 }

@@ -23,16 +23,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize application state with persistence
     let app_state = Arc::new(AppState::new().await?);
 
-    // FIXME: Hardcoded galaxy config
-    let contents = include_str!("../galaxies/blitz.yaml");
-    let galaxy_config: GalaxyConfig = serde_yaml::from_str(contents).unwrap();
-
-    // Create a new galaxy named "one" if it doesn't exist
-    match app_state.create_galaxy("one", &galaxy_config, tick()).await {
-        Ok(msg) => log::info!("{}", msg),
-        Err(e) => log::error!("Failed to create initial galaxy: {}", e),
-    }
-
     serve(app_state).await
 }
 

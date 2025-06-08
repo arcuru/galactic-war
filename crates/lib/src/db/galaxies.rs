@@ -113,6 +113,20 @@ impl Database {
         Ok(())
     }
 
+    /// List all galaxy names in the database
+    pub async fn list_galaxy_names(&self) -> Result<Vec<String>, PersistenceError> {
+        let rows = sqlx::query("SELECT name FROM galaxies ORDER BY name")
+            .fetch_all(&self.pool)
+            .await?;
+
+        let names = rows
+            .into_iter()
+            .map(|row| row.get::<String, _>("name"))
+            .collect();
+
+        Ok(names)
+    }
+
     /// Save complete galaxy state to database
     pub async fn save_galaxy_state(
         &self,
@@ -138,11 +152,13 @@ impl Database {
                 .await?;
         } else {
             // Update galaxy metadata
-            sqlx::query("UPDATE galaxies SET tick = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?")
-                .bind(galaxy.get_tick() as i64)
-                .bind(galaxy_name)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query(
+                "UPDATE galaxies SET tick = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?",
+            )
+            .bind(galaxy.get_tick() as i64)
+            .bind(galaxy_name)
+            .execute(&mut *tx)
+            .await?;
         }
 
         // Get dirty systems to minimize database writes
@@ -614,6 +630,40 @@ mod tests {
                 water: 150
             }
         );
+
+        db.close().await;
+    }
+
+    #[tokio::test]
+    async fn test_list_galaxy_names() {
+        let db = Database::new_test()
+            .await
+            .expect("Failed to create test database");
+
+        // Initially should be empty
+        let names = db
+            .list_galaxy_names()
+            .await
+            .expect("Failed to list galaxy names");
+        assert!(names.is_empty());
+
+        // Create some galaxies
+        db.create_galaxy("alpha", "config_alpha", 0)
+            .await
+            .expect("Failed to create galaxy alpha");
+        db.create_galaxy("beta", "config_beta", 100)
+            .await
+            .expect("Failed to create galaxy beta");
+        db.create_galaxy("gamma", "config_gamma", 200)
+            .await
+            .expect("Failed to create galaxy gamma");
+
+        // List should now contain all galaxies in alphabetical order
+        let names = db
+            .list_galaxy_names()
+            .await
+            .expect("Failed to list galaxy names");
+        assert_eq!(names, vec!["alpha", "beta", "gamma"]);
 
         db.close().await;
     }
