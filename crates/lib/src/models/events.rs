@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 
 /// Database row representing an event within a system
-#[derive(Debug, Clone, PartialEq)]
-#[derive(sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct EventRow {
     pub id: i64,
     pub system_id: i64,

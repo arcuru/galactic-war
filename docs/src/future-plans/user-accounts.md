@@ -5,6 +5,7 @@ _This section describes future enhancements to the user account system for Galac
 ## Current Implementation Status
 
 ✅ **COMPLETED**: Basic user accounts are now implemented with:
+
 - Server-level user registration and authentication
 - Galaxy-specific accounts (one per galaxy per user)
 - System ownership and access control
@@ -20,12 +21,14 @@ The following features represent planned extensions to the existing user account
 ## Advanced Authentication Features
 
 ### Enhanced Security
+
 - **Password Recovery** - Email-based password reset functionality
 - **Two-Factor Authentication** - Enhanced account security with TOTP/SMS
 - **OAuth Integration** - Login with Google, GitHub, Discord, etc.
 - **Account Lockout** - Protection against brute force attacks
 
 ### Cross-Galaxy Features
+
 - **Cross-Galaxy Statistics** - Overall account achievements and stats across all galaxies
 - **Global Leaderboards** - Rankings that span multiple galaxies
 - **Achievement System** - Account-wide achievements and badges
@@ -111,6 +114,7 @@ Special permissions for galaxy management:
 ### Current Status
 
 The basic user account system is now fully functional with:
+
 - User registration and login working
 - Multi-galaxy account support implemented
 - System ownership and access control in place

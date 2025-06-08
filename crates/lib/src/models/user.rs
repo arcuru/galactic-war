@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 
 /// Database row representing a server-level user account
-#[derive(Debug, Clone, PartialEq)]
-#[derive(sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct UserRow {
     pub id: i64,
     pub username: String,
@@ -27,8 +26,7 @@ impl UserRow {
 }
 
 /// Database row representing a user's account within a specific galaxy
-#[derive(Debug, Clone, PartialEq)]
-#[derive(sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct UserGalaxyAccountRow {
     pub id: i64,
     pub user_id: i64,
@@ -57,8 +55,7 @@ impl UserGalaxyAccountRow {
 }
 
 /// Database row representing a user session for authentication
-#[derive(Debug, Clone, PartialEq)]
-#[derive(sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct UserSessionRow {
     pub id: String, // Session token
     pub user_id: i64,

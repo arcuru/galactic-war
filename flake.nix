@@ -119,7 +119,14 @@
             tools.rustfmt = toolChain;
             hooks = {
               alejandra.enable = true; # Nix formatting
-              prettier.enable = true; # Markdown formatting
+              prettier = {
+                enable = true;
+                excludes = [
+                  "docs/book/\\.html"
+                  "docs/mermaid.min.js"
+                  "docs/theme/*"
+                ];
+              };
               rustfmt.enable = true; # Rust formatting
             };
           };

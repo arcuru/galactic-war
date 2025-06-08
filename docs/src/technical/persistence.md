@@ -22,17 +22,17 @@ graph TB
         AS[AppState Manager<br/>Coordinates state]
         CACHE[In-Memory Galaxy Cache<br/>GALAXIES HashMap]
     end
-    
+
     subgraph "Persistence Layer"
         PM[Persistence Manager<br/>Background saves]
         WC[Write Coalescing<br/>Batch operations]
         DT[Dirty Tracking<br/>Changed systems only]
     end
-    
+
     subgraph "Database Layer"
         CP[Connection Pool<br/>SQLite connections]
         DB[(SQLite Database)]
-        
+
         subgraph "Tables"
             T1[galaxies]
             T2[systems]
@@ -40,7 +40,7 @@ graph TB
             T4[events]
         end
     end
-    
+
     AS --> CACHE
     AS --> PM
     PM --> WC
@@ -48,15 +48,15 @@ graph TB
     WC --> CP
     DT --> CP
     CP --> DB
-    
+
     DB --> T1
     DB --> T2
     DB --> T3
     DB --> T4
-    
+
     CACHE -.->|Load on miss| PM
     PM -.->|Auto-save timer| WC
-    
+
     style AS fill:#e1f5fe
     style CACHE fill:#e8f5e8
     style PM fill:#f3e5f5
@@ -78,7 +78,7 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    
+
     systems {
         integer id PK
         string galaxy_name FK
@@ -90,7 +90,7 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    
+
     structures {
         integer id PK
         integer system_id FK
@@ -99,7 +99,7 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
-    
+
     events {
         integer id PK
         integer system_id FK
@@ -108,7 +108,7 @@ erDiagram
         string structure_type
         timestamp created_at
     }
-    
+
     galaxies ||--o{ systems : contains
     systems ||--o{ structures : has
     systems ||--o{ events : schedules
@@ -179,13 +179,13 @@ CREATE TABLE events (
 
 The persistence system is configured through environment variables:
 
-| Variable                            | Default                  | Description                     |
-| ----------------------------------- | ------------------------ | ------------------------------- |
-| `DATABASE_URL`                      | `sqlite:galactic_war.db` | Database connection string      |
-| `GWAR_PERSISTENCE_ENABLED`          | `true`                   | Enable/disable persistence      |
-| `GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL` | `30`                     | Auto-save interval (seconds)    |
-| `GWAR_PERSISTENCE_SHUTDOWN_TIMEOUT` | `10`                     | Shutdown save timeout (seconds) |
-| `GWAR_PERSISTENCE_WRITE_COALESCING` | `true`                   | Enable write batching           |
+| Variable                               | Default                  | Description                     |
+| -------------------------------------- | ------------------------ | ------------------------------- |
+| `DATABASE_URL`                         | `sqlite:galactic_war.db` | Database connection string      |
+| `GWAR_PERSISTENCE_ENABLED`             | `true`                   | Enable/disable persistence      |
+| `GWAR_PERSISTENCE_AUTO_SAVE_INTERVAL`  | `30`                     | Auto-save interval (seconds)    |
+| `GWAR_PERSISTENCE_SHUTDOWN_TIMEOUT`    | `10`                     | Shutdown save timeout (seconds) |
+| `GWAR_PERSISTENCE_WRITE_COALESCING`    | `true`                   | Enable write batching           |
 | `GWAR_PERSISTENCE_COALESCING_DELAY_MS` | `1000`                   | Write coalescing delay (ms)     |
 
 ### Example Configuration
@@ -224,14 +224,14 @@ sequenceDiagram
     participant Timer
     participant PM as Persistence Manager
     participant DB as Database
-    
+
     GE->>DT: Mark system dirty
     Note over DT: System coordinates stored
-    
+
     Timer->>PM: Auto-save interval (30s)
     PM->>DT: Check for dirty galaxies
     DT-->>PM: Return dirty systems list
-    
+
     alt Has dirty systems
         PM->>DB: Begin transaction
         PM->>DB: Batch save dirty systems
@@ -287,16 +287,16 @@ Multiple rapid changes are batched together to improve performance:
 ```mermaid
 timeline
     title Write Coalescing Timeline
-    
+
     section Collection Phase
         0ms    : Change 1 : System marked dirty
         250ms  : Change 2 : Same system updated
         500ms  : Change 3 : Another system dirty
         750ms  : Change 4 : More changes accumulate
-    
+
     section Coalescing Delay
         1000ms : Delay Complete : Wait period ends
-        
+
     section Batch Write
         1010ms : Begin Transaction : Start database write
         1050ms : Save All Changes : Single transaction

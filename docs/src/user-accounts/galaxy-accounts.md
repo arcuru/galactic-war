@@ -5,12 +5,14 @@ Galaxy accounts represent a user's presence within a specific galaxy. Each user 
 ## Galaxy Account Concept
 
 ### One Account Per Galaxy
+
 - Users can join multiple galaxies
 - Each galaxy requires a separate account
 - Account names must be unique within each galaxy
 - Users cannot have multiple accounts in the same galaxy
 
 ### Account Isolation
+
 - Each galaxy account is independent
 - Resources, systems, and progress are separate
 - Account names can be different across galaxies
@@ -19,19 +21,23 @@ Galaxy accounts represent a user's presence within a specific galaxy. Each user 
 ## Joining a Galaxy
 
 ### Prerequisites
+
 - Must have a registered user account
 - Must be logged in
 - Galaxy must exist and be accessible
 - Account name must be available in the target galaxy
 
 ### Galaxy Join Process
+
 1. User selects galaxy from available list
 2. Chooses unique account name for that galaxy
 3. System automatically generates a system for the user
 4. User gains access to galaxy-specific features
 
 ### System Assignment
+
 When joining a galaxy:
+
 - A new system is automatically created
 - System placed at random coordinates within galaxy bounds
 - User becomes the owner of that system
@@ -51,19 +57,23 @@ pub async fn join_galaxy(
 ## Account Management
 
 ### Account Information
+
 Each galaxy account tracks:
+
 - **Account Name**: Display name within the galaxy
 - **Join Date**: When the user first joined the galaxy
 - **Last Active**: Most recent activity timestamp
 - **System Ownership**: Which systems belong to this account
 
 ### Activity Tracking
+
 - Last active time updated on galaxy access
 - Used for leaderboards and activity metrics
 - Helps identify inactive accounts
 - Supports future features like inactivity cleanup
 
 ### Account Display
+
 ```rust
 pub struct UserGalaxyAccount {
     pub id: i64,
@@ -78,20 +88,25 @@ pub struct UserGalaxyAccount {
 ## Multi-Galaxy Experience
 
 ### Unified Dashboard
+
 Users see all their galaxy accounts from one dashboard:
+
 - List of joined galaxies
 - Account name and activity for each
 - Quick access to each galaxy
 - Join new galaxies option
 
 ### Context Switching
+
 - Users can switch between galaxies easily
 - Each galaxy maintains separate game state
 - Progress and resources don't transfer between galaxies
 - Account names and reputations are galaxy-specific
 
 ### Galaxy-Specific Features
+
 Within each galaxy, users can:
+
 - Manage their assigned systems
 - Build and upgrade structures
 - View galaxy-wide statistics
@@ -100,6 +115,7 @@ Within each galaxy, users can:
 ## Database Schema
 
 ### User Galaxy Accounts Table
+
 ```sql
 CREATE TABLE user_galaxy_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,6 +132,7 @@ CREATE TABLE user_galaxy_accounts (
 ```
 
 ### Key Constraints
+
 - **One Account Per Galaxy**: `UNIQUE(user_id, galaxy_name)`
 - **Unique Names**: `UNIQUE(galaxy_name, account_name)`
 - **Referential Integrity**: Foreign keys ensure data consistency
@@ -123,6 +140,7 @@ CREATE TABLE user_galaxy_accounts (
 ## API Operations
 
 ### Account Creation
+
 ```rust
 pub async fn create_user_galaxy_account(
     &self,
@@ -133,6 +151,7 @@ pub async fn create_user_galaxy_account(
 ```
 
 ### Account Retrieval
+
 ```rust
 // Get specific galaxy account
 pub async fn get_user_galaxy_account(
@@ -149,6 +168,7 @@ pub async fn get_user_galaxy_accounts(
 ```
 
 ### Activity Updates
+
 ```rust
 pub async fn update_user_activity(
     &self,
@@ -158,6 +178,7 @@ pub async fn update_user_activity(
 ```
 
 ### Name Availability
+
 ```rust
 pub async fn is_account_name_available(
     &self,
@@ -169,21 +190,25 @@ pub async fn is_account_name_available(
 ## Web Interface
 
 ### Dashboard View
+
 The user dashboard shows:
+
 ```html
 <div class="galaxy-item">
-    <div class="galaxy-name">Alpha Centauri</div>
-    <div>Account: CommanderSmith</div>
-    <div>Joined: 2024-01-15 10:30 UTC</div>
-    <div>Last Active: 2024-01-20 14:22 UTC</div>
-    <a href="/galaxy/alpha-centauri/dashboard">
-        <button>Enter Galaxy</button>
-    </a>
+  <div class="galaxy-name">Alpha Centauri</div>
+  <div>Account: CommanderSmith</div>
+  <div>Joined: 2024-01-15 10:30 UTC</div>
+  <div>Last Active: 2024-01-20 14:22 UTC</div>
+  <a href="/galaxy/alpha-centauri/dashboard">
+    <button>Enter Galaxy</button>
+  </a>
 </div>
 ```
 
 ### Galaxy-Specific Dashboard
+
 Each galaxy has its own management interface:
+
 - Account information display
 - List of owned systems
 - Galaxy-specific statistics
@@ -192,18 +217,21 @@ Each galaxy has its own management interface:
 ## Business Rules
 
 ### Account Limits
+
 - Maximum one account per galaxy per user
 - No limit on number of galaxies a user can join
 - Account names must be 3-50 characters
 - Account names must be unique within each galaxy
 
 ### System Ownership
+
 - Each account owns exactly one system per galaxy
 - Systems cannot be transferred between accounts
 - System ownership tied to galaxy account, not user account
 - Deleting galaxy account removes system ownership
 
 ### Naming Rules
+
 - Account names are case-sensitive
 - Special characters allowed in account names
 - Account names cannot be changed after creation
@@ -212,6 +240,7 @@ Each galaxy has its own management interface:
 ## Future Enhancements
 
 ### Potential Features
+
 - Account name changes (with cooldown)
 - Account deletion and system reassignment
 - Cross-galaxy messaging or achievements

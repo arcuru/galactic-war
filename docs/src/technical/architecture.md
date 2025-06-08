@@ -11,38 +11,38 @@ graph TB
         CLI[CLI Client]
         TP[Third-party Tools]
     end
-    
+
     subgraph "Server Layer"
         API[HTTP API<br/>Axum Server<br/>Port 3050]
     end
-    
+
     subgraph "Core Library (crates/lib)"
         GE[Game Engine<br/>Galaxy Management<br/>Event System]
         AS[AppState<br/>State Coordination]
     end
-    
+
     subgraph "Persistence Layer"
         PM[Persistence Manager<br/>Auto-save & Load]
         DB[(SQLite Database<br/>Galaxies, Systems, Events)]
     end
-    
+
     subgraph "Configuration"
         AC[App Config<br/>config.yaml]
         GC[Galaxy Configs<br/>data/*.yaml]
     end
-    
+
     WF --> API
     CLI --> API
     TP --> API
-    
+
     API --> GE
     GE --> AS
     AS --> PM
     PM --> DB
-    
+
     AC --> API
     GC --> GE
-    
+
     style WF fill:#e1f5fe
     style CLI fill:#e1f5fe
     style TP fill:#e1f5fe
@@ -183,7 +183,7 @@ sequenceDiagram
     participant GE as Game Engine
     participant PM as Persistence Manager
     participant DB as Database
-    
+
     Client->>API: HTTP Request (e.g., build structure)
     API->>GE: Call library function
     GE->>GE: Validate request
@@ -192,7 +192,7 @@ sequenceDiagram
     GE->>PM: Mark system as dirty
     GE-->>API: Return response
     API-->>Client: HTTP Response
-    
+
     Note over PM: Background Process
     PM->>PM: Check dirty systems
     PM->>DB: Batch save changes
@@ -208,7 +208,7 @@ sequenceDiagram
     participant PM as Persistence Manager
     participant WS as WebSocket
     participant Client
-    
+
     Timer->>GE: Tick event (every second)
     GE->>GE: Process completed events
     GE->>GE: Update resources & production
@@ -290,13 +290,13 @@ task run:docker
 graph TB
     subgraph "Docker Infrastructure"
         LB[Load Balancer<br/>nginx/traefik]
-        
+
         subgraph "Galaxy Containers"
             GC1[Galaxy Container 1<br/>Classic Mode]
             GC2[Galaxy Container 2<br/>Blitz Mode]
             GC3[Galaxy Container N<br/>Custom Mode]
         end
-        
+
         subgraph "Shared Services"
             SD[Service Discovery<br/>consul/etcd]
             HM[Health Monitor<br/>prometheus]
@@ -304,19 +304,19 @@ graph TB
             DB2[(Persistent Volume<br/>Galaxy 2 DB)]
         end
     end
-    
+
     Users --> LB
     LB --> GC1
     LB --> GC2
     LB --> GC3
-    
+
     GC1 --> DB1
     GC2 --> DB2
-    
+
     SD --> GC1
     SD --> GC2
     SD --> GC3
-    
+
     HM --> GC1
     HM --> GC2
     HM --> GC3

@@ -222,7 +222,7 @@ pub struct AuthResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Database, AuthService, AuthError};
+    use crate::{AuthError, AuthService, Database};
     use chrono::{Duration, Utc};
 
     #[tokio::test]

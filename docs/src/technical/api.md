@@ -43,12 +43,12 @@ graph LR
         STRUCTURE["/{galaxy}/{x}/{y}/{structure}"]
         ACTION["/{galaxy}/{x}/{y}/{structure}/build"]
     end
-    
+
     ROOT --> GALAXY
     GALAXY --> SYSTEM
     SYSTEM --> STRUCTURE
     STRUCTURE --> ACTION
-    
+
     ROOT -.-> |"List available galaxies"| ROOT
     GALAXY -.-> |"Galaxy overview"| GALAXY
     SYSTEM -.-> |"System details"| SYSTEM
@@ -75,6 +75,7 @@ GET /{galaxy}
 Returns overview information for a specific galaxy.
 
 **Parameters:**
+
 - `galaxy` - Galaxy name (e.g., "classic", "blitz")
 
 ## Core Endpoints
@@ -167,17 +168,17 @@ sequenceDiagram
     participant API as HTTP API
     participant GE as Game Engine
     participant DB as Database
-    
+
     C->>API: GET /{galaxy}/{x}/{y}/asteroidmine/build
     API->>GE: galaxy.build(x, y, "asteroidmine")
-    
+
     alt Sufficient Resources
         GE->>GE: Deduct resources
         GE->>GE: Create build event
         GE->>GE: Mark system dirty
         GE-->>API: Success + Event details
         API-->>C: 200 OK + Event JSON
-        
+
         Note over DB: Background save
         GE->>DB: Auto-save dirty system
     else Insufficient Resources
@@ -189,8 +190,9 @@ sequenceDiagram
 Start construction of a new structure or upgrade an existing one.
 
 **Parameters:**
+
 - `galaxy` - Galaxy name
-- `x`, `y` - System coordinates  
+- `x`, `y` - System coordinates
 - `structure` - Structure type to build
 
 **Response:**
@@ -217,6 +219,7 @@ GET /{galaxy}/{x}/{y}/{structure_type}
 Get detailed information about a specific structure type in a system.
 
 **Parameters:**
+
 - `galaxy` - Galaxy name
 - `x`, `y` - System coordinates
 - `structure_type` - Type of structure (colony, asteroidmine, etc.)
@@ -250,15 +253,15 @@ sequenceDiagram
     participant WS as WebSocket Server
     participant GE as Game Engine
     participant Timer
-    
+
     C->>WS: Connect to ws://localhost:3050/ws
     WS-->>C: Connection established
-    
+
     Note over Timer,GE: Every tick (1 second)
     Timer->>GE: Process tick
     GE->>GE: Complete events
     GE->>GE: Update production
-    
+
     alt Changes occurred
         GE->>WS: Broadcast system updates
         WS->>C: System update message
@@ -314,16 +317,16 @@ Sent when an event completes:
 ```mermaid
 flowchart TD
     REQ[API Request] --> VAL{Validate Request}
-    
+
     VAL -->|Invalid Galaxy| E1[404: Galaxy not found]
     VAL -->|Invalid Coords| E2[404: System not found]
     VAL -->|Invalid Structure| E3[400: Invalid structure type]
     VAL -->|Valid| CHECK{Check Preconditions}
-    
+
     CHECK -->|Insufficient Resources| E4[400: Insufficient resources]
     CHECK -->|Already Building| E5[409: Construction in progress]
     CHECK -->|Valid| SUCCESS[200: Success]
-    
+
     E1 --> ERROR[Error Response]
     E2 --> ERROR
     E3 --> ERROR

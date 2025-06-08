@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 
 /// Database row representing a galaxy
-#[derive(Debug, Clone, PartialEq)]
-#[derive(sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct GalaxyRow {
     pub name: String,
     pub config_file: String,
