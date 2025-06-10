@@ -6,39 +6,28 @@ tasks:
   default:
     cmd: task --list
     silent: true
+  ci:
+    desc: Run all local CI checks (excludes containers)
+    aliases: [ci:local]
+    deps:
+      [
+        fmt,
+        clippy,
+        test,
+        docs:build,
+        audit,
+        pre-commit,
+        nix:check,
+        nix:build,
+        build,
+      ]
   ci:full:
     desc: Run CI locally in containers
     cmd: act
-  ci:local:
-    desc: Run CI locally
-    aliases: [ci]
-    deps:
-      [
-        audit,
-        doc,
-        fmt,
-        test,
-        nix:check,
-        nix:build,
-        clippy,
-        pre-commit,
-        build,
-        build:docker,
-      ]
-  nix:check:
-    desc: Run Nix CI checks
-    cmds:
-      - nix flake check
-  nix:build:
-    desc: Run Nix Build
-    cmds:
-      - nix build
+  # CI/QA tasks
   clippy:
     desc: Run clippy on all workspace crates
-    cmd: cargo clippy --workspace
-  pre-commit:
-    desc: Run pre-commit
-    cmd: pre-commit run --all-files --show-diff-on-failure
+    cmd: cargo clippy --workspace --all-targets -- --deny warnings
   fmt:
     desc: Run all formatters
     cmds:
@@ -48,16 +37,36 @@ tasks:
     desc: Run all tests in workspace
     aliases: [t]
     cmd: cargo nextest run --workspace
-  doc:
-    desc: Build the documentation for all workspace crates
-    cmd: cargo doc --workspace
   audit:
     desc: Run cargo security audit
-    cmd: cargo audit
+    cmd: cargo audit --ignore RUSTSEC-2023-0071
+  pre-commit:
+    desc: Run pre-commit
+    cmd: pre-commit run --all-files --show-diff-on-failure
+
+  # Nix tasks
+  nix:check:
+    desc: Run Nix CI checks
+    cmds:
+      - nix flake check
+  nix:build:
+    desc: Run Nix Build
+    cmds:
+      - nix build
+
+  # Build tasks
   build:
     desc: Build the entire workspace
     aliases: [b]
     cmd: cargo build --workspace
+  build:lib:
+    desc: Build only the library crate
+    cmd: cargo build -p galactic-war
+  build:bin:
+    desc: Build only the binary crate
+    cmd: cargo build -p galactic-war-bin
+
+  # Run tasks
   run:
     desc: Run the galactic-war server binary
     aliases: [r]
@@ -73,18 +82,16 @@ tasks:
     cmds:
       - mkdir -p ".cache/galactic-war"
       - cargo run --bin galactic-war
-  build:lib:
-    desc: Build only the library crate
-    cmd: cargo build -p galactic-war
-  build:bin:
-    desc: Build only the binary crate
-    cmd: cargo build -p galactic-war-bin
+
+  # Test tasks (specific crates)
   test:lib:
     desc: Run tests for library crate only
     cmd: cargo nextest run -p galactic-war
   test:bin:
     desc: Run tests for binary crate only
     cmd: cargo nextest run -p galactic-war-bin
+
+  # Docker tasks
   build:docker:
     desc: Build the docker image
     cmd: docker build -t galactic-war .
@@ -92,9 +99,52 @@ tasks:
     desc: Run the docker image
     cmd: docker run --rm -p 3050:3050 --name galactic-war galactic-war:latest
     deps: [build:docker]
-  docs:serve:
-    desc: Serve and open the mdbook documentation
-    aliases: [docs]
+  # Development tasks
+  clean:
+    desc: Clean all build artifacts
+    cmds:
+      - cargo clean
+      - rm -rf target/
+
+  watch:
+    desc: Watch for changes and rebuild
+    cmd: cargo watch -x "build --workspace"
+
+  watch:test:
+    desc: Watch for changes and run tests
+    cmd: cargo watch -x "nextest run --workspace"
+
+  coverage:
+    desc: Generate test coverage report
+    cmd: cargo tarpaulin --out html --output-dir target/coverage
+
+  deps:update:
+    desc: Update dependencies
+    cmds:
+      - cargo update
+      - nix flake update
+
+  check:quick:
+    desc: Quick development checks (fmt + clippy + test)
+    aliases: [check]
+    deps: [fmt, clippy, test]
+
+  # Documentation tasks
+  docs:
+    desc: Build and serve the mdbook documentation
+    aliases: [docs:serve]
     dir: docs
     cmds:
       - mdbook serve --open
+  docs:build:
+    desc: Build all documentation (mdbook + cargo doc)
+    cmds:
+      - task: docs:cargo
+      - task: docs:mdbook
+  docs:mdbook:
+    desc: Build the mdbook documentation only
+    dir: docs
+    cmd: mdbook build
+  docs:cargo:
+    desc: Build the Rust documentation for all workspace crates
+    cmd: cargo doc --workspace
