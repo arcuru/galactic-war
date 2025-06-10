@@ -9,3 +9,6 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/arcuru/galactic-war"
 homepage = "https://galactic-war.com"
+
+[workspace.metadata.crane]
+name = "galactic-war"

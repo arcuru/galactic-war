@@ -7,7 +7,6 @@
       url = "github:cachix/pre-commit-hooks.nix";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        nixpkgs-stable.follows = "nixpkgs";
       };
     };
 
@@ -76,7 +75,11 @@
       cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
       # Build the actual crate itself, reusing the cargoArtifacts
-      galactic-war = craneLib.buildPackage commonArgs;
+      galactic-war = craneLib.buildPackage (commonArgs
+        // {
+          doCheck = false; # Tests are run as a separate step
+          meta.mainProgram = "galactic-war";
+        });
     in {
       checks =
         {
@@ -105,6 +108,10 @@
           crate-audit = craneLib.cargoAudit (commonArgs
             // {
               inherit (inputs) advisory-db;
+              # Ignoring RUSTSEC-2023-0071 (RSA Marvin Attack) as it's a transitive dependency
+              # through sqlx-mysql that we cannot easily fix. The vulnerability requires specific
+              # conditions to exploit and is medium severity.
+              cargoAuditExtraArgs = "--ignore RUSTSEC-2023-0071";
             });
         }
         // lib.optionalAttrs (system == "x86_64-linux") {
